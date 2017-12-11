@@ -1,0 +1,185 @@
+package main  
+import (  
+    "crypto/md5"
+    "fmt"  
+    "net"  
+    "log"  
+    "os"  
+)  
+const (
+    HOSTIPPORT = "0.0.0.0:9900"
+
+
+)
+  
+func main() {  
+  
+//建立socket，监听端口  
+    netListen, err := net.Listen("tcp", HOSTIPPORT)  
+    CheckError(err)  
+    defer netListen.Close()  
+  
+    Log("Waiting for clients")  
+    for {  
+        conn, err := netListen.Accept()  
+        if err != nil {  
+            continue  
+        }  
+  
+        Log(conn.RemoteAddr().String(), " tcp connect success")  
+        handleConnection(conn)  
+    }  
+}  
+//处理连接  
+func handleConnection(conn net.Conn) {  
+  
+    buffer := make([]byte, 2048)  
+  
+    for {  
+  
+        n, err := conn.Read(buffer)  
+  
+        if err != nil {  
+            Log(conn.RemoteAddr().String(), " connection error: ", err)  
+            return  
+        }  
+        
+        
+        Log(conn.RemoteAddr().String(), "receive data string:\n", string(buffer[:n]))  
+  
+    }  
+  
+} 
+
+func Read_robot_abort(conn net.Conn)(
+
+func Send_robot_res(conn net.Conn)(int , error){
+   type ROBOTRES struct {
+       Type string `json:"type"`
+	   Robot_id  int64 `json:"robot_id"`
+	   Time  int64  `json:"time"`
+	   Crc string `json:"crc"`
+   
+   }
+   var robot_res  ROBOTRES
+   robot_res.Type  =  "robot_res"
+   robot_res.Robot_id = 12333434343
+   robot_res.Time = time.Now().Unix()
+   str := robot_res.Type + fmt.Sprintf("%ld",robot_res.Robot_id)+fmt.Sprintf("%ld",robot_res.Time)
+   robot_res.Crc = CalcMd5(str)
+   b , _ :=json.Marshal(robot_res)
+   n,err := conn.write(b)
+   
+   return n , err
+   
+   
+
+
+}
+func Read_robot_req(conn net.Conn) (int, error){
+    type ROBOTREQ struct {
+	   Type string `json:"type"`
+	   Time int64  `json:"time"`
+	   Crc  string `json:"crc"`
+	
+	}
+	buffer := make([]byte, 2048) 
+	n, err := conn.Read(buffer) 
+    if err != nil {  
+        Log(conn.RemoteAddr().String(), " connection error: ", err)  
+        return  n, err
+    }
+    var robot_req ROBOTREQ
+    err = json.Unmarshal(buffer,&robot_req)	
+	if robot_req.Type != "rebot_req" {
+	   return -1 ,nil
+	}
+	
+	
+	return  0 , nil
+	
+
+}
+
+func CalcMd5(str string) string {
+   data := []byte(str)
+   has := md5.Sum(data)
+   md5str1 := fmt.Sprintf("%x", has) //将[]byte转成16进制
+   return md5str1
+
+}
+func  Send_auth_succ(conn net.Conn , i_succ  int) (int ,error){
+      s  := `{"type" : "auth_succ"   ,"result" : %d , "time" : %ld, "crc" : %s}`
+	  i_time := time.Now().Unix()
+	  hashstr := "auth_succ" + fmt.Sprintf("%d",i_succ)+fmt.Sprintf("%ld",i_time)
+	  n , err := conn.Write([]byte(fmt.Sprintf(s,i_succ,i_time,CalcMd5(hashstr))))
+	  return n ,err
+    
+
+}
+func Read_auth_res(conn net.Conn) (int, error){
+     buffer := make([]byte, 2048) 
+	 n, err := conn.Read(buffer) 
+     if err != nil {  
+            Log(conn.RemoteAddr().String(), " connection error: ", err)  
+            return  n, err
+     }  
+     	 
+     skey2 := "91ylordai2"
+	 type AUTHRES struct {
+	    Type string `json: "type" bson: "type"`
+		Sign string `json: "sign" bson: "sign"`
+		Time int64  `json: "time" bson: "time"`
+		Crc  string `json: "crc" bson: "crc"`
+	 
+	 }
+	 var auth_res AUTHRES
+	 err = json.Unmarshal(buffer,&auth_res)
+	 if err != nil {
+	    return -1, err
+	 }
+	 
+	 if auth_res.Type != "auth_res" {
+	     return -2, nil
+	 }
+	 if auth_res.Sign 1= CalcMd5("zimakaimen"+skey2) {
+	     return -3, nil
+	 }
+	 
+	 
+	 return 0 , nil
+	 
+
+}
+
+func Send_auth_req(conn net.Conn) (int ,error){
+     skey1 := "91ylordai"
+     type AUTHREQ struct {
+	    Type string `json: "type" bson: "type"`
+		Sign string `json: "sign" bson: "sign"`
+		Time int64  `json: "time" bson: "time"`
+		Crc  string `json: "crc" bson: "crc"`
+	 
+	 }
+	 var  auth_req AUTHREQ
+	 auth_req.Type = "auth_req"
+	 auth_req.Sign = "zimakaimen"
+	 auth_req.Time = time.Now().Unix()
+	 str_md5 := auth_req.Type + auth_req.Sign + fmt.Sprintf("%ld",auth_req.Time)+skey1
+	 auth_req.Crc = CalcMd5(str_md5)
+	 str_auth_req ,_ := json.Marshal(auth_req)
+	 n,err := conn.Write([]byte(str_auth_req))
+	 return n,err
+	 
+
+}
+func Log(v ...interface{}) {  
+    log.Println(v...)  
+}  
+  
+func CheckError(err error) {  
+    if err != nil {  
+        fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())  
+        os.Exit(1)  
+    }  
+} 
