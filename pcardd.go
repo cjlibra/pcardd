@@ -51,6 +51,25 @@ func handleConnection(conn net.Conn) {
 	    return
 	}
 	
+	n.err = Read_robot_req(conn )
+	if !(n==0 && err == nil) {
+	     Log(time.Now(),"--",conn.RemoteAddr().String(),"read robot req  error number:",n,"error:",err)
+		 return
+	}
+	
+	n,err = Send_robot_res(conn)
+	if  err != nil {
+	    Log(time.Now(),"--",conn.RemoteAddr().String(),"send robot res  error number:",n,"error:",err)
+		return
+	
+	}
+	for {
+		n,err = Read_action_cmd(conn)
+		if !(n==0 && err == nil){
+			Log(time.Now(),"--",conn.RemoteAddr().String(),"Read_action_cmd  error number:",n,"error:",err)
+			
+		}
+	}
       
   
 } 
@@ -209,12 +228,23 @@ func Read_action_cmd(conn net.Conn)(int,error){
 			
 		case "bid_reply" :
 		    read_bid_reply(buffer)
+			n,err = Send_bid_req(conn)
+			if err != nil {
+			     Log(conn.RemoteAddr().String(), "Send_bid_req error number: ",n,"error :", err)  
+                 return  n, err
+			}
+			
 			
 		case "bid_bottom" :
 		    read_bid_bottom(buffer)
 			
 		case "out_reply"  :
 		    read_out_reply(buffer)
+			n,err = Send_out_req(conn)
+			if err != nil {
+			    Log(conn.RemoteAddr().String(), "Send_out_req error number: ",n,"error :", err)  
+                return  n, err
+			}
 			
 		case "game_end" :
 		    read_game_end(buffer)
@@ -228,6 +258,9 @@ func Read_action_cmd(conn net.Conn)(int,error){
 	
 	
 	}
+	
+	
+	return 0,nil
 
 
 
