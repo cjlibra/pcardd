@@ -5,6 +5,8 @@ import (
     "net"  
     "log"  
     "os"  
+	"time"
+	"encoding/json"
 )  
 const (
     HOSTIPPORT = "0.0.0.0:9900"
@@ -51,7 +53,7 @@ func handleConnection(conn net.Conn) {
 	    return
 	}
 	
-	n.err = Read_robot_req(conn )
+	n,err = Read_robot_req(conn )
 	if !(n==0 && err == nil) {
 	     Log(time.Now(),"--",conn.RemoteAddr().String(),"read robot req  error number:",n,"error:",err)
 		 return
@@ -73,44 +75,60 @@ func handleConnection(conn net.Conn) {
       
   
 } 
-func  read_robot_abort(buffer string) int {
+func  read_robot_abort(buffer []byte) int {
     type ROBOTABORT struct {
 	   Type string `json:"type"`
 	   Robot_id int64 `json:"robot_id"`
 	   Time int64 `json:"time"`
 	   Crc string `json:"crc"`
 	}
+	var robotabort ROBOTABORT
+	json.Unmarshal([]byte(buffer),&robotabort)
+	Log(robotabort)
+	return 0
 }
-func  read_game_begin(buffer string) int {
+func  read_game_begin(buffer []byte) int {
     type GAMEBEGIN struct {
 	    Type string `json:"type"`
 	    Robot_id int64 `json:"robot_id"`
 	    Yourseat int8 `json:"yourseat"`
 	    Crc string `json:"crc"`
 	}
+	var gamebegin GAMEBEGIN
+	json.Unmarshal([]byte(buffer),&gamebegin)
+	Log(gamebegin)
+	return 0
 }
 			
-func  read_play_info(buffer string ) int {
-    type GAMEBEGIN struct {
+func  read_play_info(buffer []byte ) int {
+    type PLAYINFO struct {
 	    Type string `json:"type"`
 	    Robot_id int64 `json:"robot_id"`
 	    Info string `json:"info"`
 		Time int64 `json:"time"`
 	    Crc string `json:"crc"`
 	}
+	var  playinfo PLAYINFO
+	json.Unmarshal([]byte(buffer),&playinfo)
+	Log(playinfo)
+	return 0
 }
 		
-func  read_deal_card(buffer string ) int {
-    type GAMEBEGIN struct {
+func  read_deal_card(buffer []byte ) int {
+    type DEALCARD struct {
 	    Type string `json:"type"`
 	    Robot_id int64 `json:"robot_id"`
 	    Cards string `json:"cards"`
 		Time int64 `json:"time"`
 	    Crc string `json:"crc"`
 	}
+	var dealcard DEALCARD
+	json.Unmarshal([]byte(buffer),&dealcard)
+	Log(dealcard)
+	return 0
 }
 			
-func  read_turn(buffer string) int {
+func  read_turn(buffer []byte) int {
     type TURN struct {
 	    Type	string `json:"type"`
 		robot_id	int64  `json:"robot_id"`
@@ -121,9 +139,13 @@ func  read_turn(buffer string) int {
 		Crc	 string `json:"crc"`
 	
 	}
+	var turnturn TURN
+	json.Unmarshal([]byte(buffer),&turnturn)
+	Log(turnturn)
+	return 0
 }
 			
-func  read_bid_reply(buffer string) int {
+func  read_bid_reply(buffer []byte) int {
     type BIDREPLY struct {
 	    Type	string  `json:"type"`
 		Robot_id	int64  `json:"robot_id"`
@@ -134,23 +156,32 @@ func  read_bid_reply(buffer string) int {
 	
 	
 	}
+	var bidreply BIDREPLY
+	json.Unmarshal([]byte(buffer),&bidreply)
+	Log(bidreply)
+	return 0
 }
 			
-func read_bid_bottom(buffer string) int {
+func read_bid_bottom(buffer []byte) int {
     type BIDBOTTOM struct {
 	    Type	string  `json:"type"`
 		Robot_id	int64 `json:"robot_id"`
 		Banker	int8 `json:"banker"`
 		Score	int8 `json:"score"`
 		Cards	string `json:"cards"`
-		Time	int 64 `json:"time"`
+		Time	int64 `json:"time"`
 		Crc	  string   `json:"crc"`
 	
 	
 	}
+	var  bidbottom BIDBOTTOM
+	json.Unmarshal([]byte(buffer),&bidbottom)
+	Log(bidbottom)
+	return 0
+	
 }
 			
-func  read_out_reply(buffer string ) int {
+func  read_out_reply(buffer []byte ) int {
     type OUTREPLY struct {
 	    Type	string  `json:"type"`
 		Robot_id	int64  `json:"robot_id"`
@@ -160,9 +191,13 @@ func  read_out_reply(buffer string ) int {
 		Crc	string   `json:"crc"`
 	
 	}
+	var outreply OUTREPLY
+	json.Unmarshal([]byte(buffer),&outreply)
+	Log(outreply)
+	return 0
 }
  			
-func  read_game_end(buffer string) int {
+func  read_game_end(buffer []byte) int {
     type GAMEEND struct {
 	    Type	string  `json:"type"`
 		Robot_id	int64  `json:"robot_id"`
@@ -172,9 +207,13 @@ func  read_game_end(buffer string) int {
 		Time	int64 `json:"time"`
 		Crc	string  `json:"crc"`
 	}
+	var gameend GAMEEND
+	json.Unmarshal([]byte(buffer),&gameend)
+	Log(gameend)
+	return 0
 }
 
-func  read_result(buffer string) int {
+func  read_result(buffer []byte) int {
      type RESULTRESULT struct {
 	    Seat	int8 `json:"seat"`
 		Result	int8 `json:"result"`
@@ -188,6 +227,10 @@ func  read_result(buffer string) int {
 		Time	int64 `json:"time"`
 		Crc	string  `json:"crc"`
 	 }
+	 var result RESULT
+	 json.Unmarshal([]byte(buffer),&result)
+	 Log(result)
+	 return 0
 
 
 }
@@ -205,7 +248,7 @@ func Read_action_cmd(conn net.Conn)(int,error){
         return  n, err
     }
     var action_cmd ROBOTREQ
-	err := json.Unmarshal(buffer,&action_cmd)
+	err = json.Unmarshal(buffer,&action_cmd)
 	if err != nil {
 	   return -1,err
 	
@@ -309,9 +352,9 @@ func Send_bid_req(conn net.Conn)(int ,error){
 	bid_req.Type = "bid_req"
 	bid_req.Robot_id = 11121313
 	bid_req.Seat = 1
-	bid_Score = 0
+	bid_req.Score = 0
 	bid_req.Time = time.Now().Unix()
-	str := bid_req.Type + fmt.Sprintf("%ld",bid_req.Robot_id)+fmt.Sprintf("%d",bid_req.Seat)+fmt.Sprintf("%d",bid_Score)+fmt.Sprintf("%ld",bid_req.Time)
+	str := bid_req.Type + fmt.Sprintf("%ld",bid_req.Robot_id)+fmt.Sprintf("%d",bid_req.Seat)+fmt.Sprintf("%d",bid_req.Score)+fmt.Sprintf("%ld",bid_req.Time)
 	bid_req.Crc = CalcMd5(str)
 	b_bid_req , _ := json.Marshal(bid_req)
 	n,err := conn.Write(b_bid_req)
@@ -338,7 +381,7 @@ func Send_robot_res(conn net.Conn)(int , error){
    str := robot_res.Type + fmt.Sprintf("%ld",robot_res.Robot_id)+fmt.Sprintf("%ld",robot_res.Time)
    robot_res.Crc = CalcMd5(str)
    b , _ :=json.Marshal(robot_res)
-   n,err := conn.write(b)
+   n,err := conn.Write(b)
    
    return n , err
    
