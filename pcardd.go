@@ -454,10 +454,10 @@ func Read_auth_res(conn net.Conn) (int, error){
      	 
      skey2 := "91ylordai2"
 	 type AUTHRES struct {
-	    Type string `json: "type" bson: "type"`
-		Sign string `json: "sign" bson: "sign"`
-		Time int64  `json: "time" bson: "time"`
-		Crc  string `json: "crc" bson: "crc"`
+	    Type string `json:"type" bson:"type"`
+		Sign string `json:"sign" bson:"sign"`
+		Time int64  `json:"time" bson:"time"`
+		Crc  string `json:"crc" bson:"crc"`
 	 
 	 }
 	 var auth_res AUTHRES
@@ -484,10 +484,10 @@ func Read_auth_res(conn net.Conn) (int, error){
 func Send_auth_req(conn net.Conn) (int ,error){
      skey1 := "91ylordai"
      type AUTHREQ struct {
-	    Type string `json: "type" bson: "type"`
-		Sign string `json: "sign" bson: "sign"`
-		Time int64  `json: "time" bson: "time"`
-		Crc  string `json: "crc" bson: "crc"`
+	    Type string `json:"type" bson:"type"`
+		Sign string `json:"sign" bson:"sign"`
+		Time int64  `json:"time" bson:"time"`
+		Crc  string `json:"crc" bson:"crc"`
 	 
 	 }
 	 var  auth_req AUTHREQ
