@@ -7,6 +7,7 @@ import (
     "os"  
 	"time"
 	"encoding/json"
+	"strings"
 )  
 const (
     HOSTIPPORT = "0.0.0.0:9900"
@@ -38,37 +39,37 @@ func handleConnection(conn net.Conn) {
     Log(conn.RemoteAddr().String())  
     n,err := Send_auth_req(conn)
 	if err != nil || n < 0{
-	    Log(time.Now(),"--",conn.RemoteAddr().String(),"send auth req error number:",n,"error:",err)
+	    Log(conn.RemoteAddr().String(),"send auth req error number:",n,"error:",err)
 		return
 	}
 	n , err = Read_auth_res(conn )
 	if !(n==0 && err == nil) {
-	   Log(time.Now(),"--",conn.RemoteAddr().String(),"read auth res error number:",n,"error:",err)
+	   Log(conn.RemoteAddr().String(),"read auth res error number:",n,"error:",err)
 	   Send_auth_succ(conn , 0)
 	   return
 	}
 	n , err = Send_auth_succ(conn , 1)
 	if err != nil {
-	    Log(time.Now(),"--",conn.RemoteAddr().String(),"send auth succ error number:",n,"error:",err)
+	    Log(conn.RemoteAddr().String(),"send auth succ error number:",n,"error:",err)
 	    return
 	}
 	
 	n,err = Read_robot_req(conn )
 	if !(n==0 && err == nil) {
-	     Log(time.Now(),"--",conn.RemoteAddr().String(),"read robot req  error number:",n,"error:",err)
+	     Log(conn.RemoteAddr().String(),"read robot req  error number:",n,"error:",err)
 		 return
 	}
 	
 	n,err = Send_robot_res(conn)
 	if  err != nil {
-	    Log(time.Now(),"--",conn.RemoteAddr().String(),"send robot res  error number:",n,"error:",err)
+	    Log(conn.RemoteAddr().String(),"send robot res  error number:",n,"error:",err)
 		return
 	
 	}
 	for {
 		n,err = Read_action_cmd(conn)
 		if !(n==0 && err == nil){
-			Log(time.Now(),"--",conn.RemoteAddr().String(),"Read_action_cmd  error number:",n,"error:",err)
+			Log(conn.RemoteAddr().String(),"Read_action_cmd  error number:",n,"error:",err)
 			
 		}
 	}
@@ -83,6 +84,7 @@ func  read_robot_abort(buffer []byte) int {
 	   Crc string `json:"crc"`
 	}
 	var robotabort ROBOTABORT
+	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&robotabort)
 	Log(robotabort)
 	return 0
@@ -95,6 +97,7 @@ func  read_game_begin(buffer []byte) int {
 	    Crc string `json:"crc"`
 	}
 	var gamebegin GAMEBEGIN
+	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&gamebegin)
 	Log(gamebegin)
 	return 0
@@ -109,6 +112,7 @@ func  read_play_info(buffer []byte ) int {
 	    Crc string `json:"crc"`
 	}
 	var  playinfo PLAYINFO
+	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&playinfo)
 	Log(playinfo)
 	return 0
@@ -123,6 +127,7 @@ func  read_deal_card(buffer []byte ) int {
 	    Crc string `json:"crc"`
 	}
 	var dealcard DEALCARD
+	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&dealcard)
 	Log(dealcard)
 	return 0
@@ -140,6 +145,7 @@ func  read_turn(buffer []byte) int {
 	
 	}
 	var turnturn TURN
+	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&turnturn)
 	Log(turnturn)
 	return 0
@@ -157,6 +163,7 @@ func  read_bid_reply(buffer []byte) int {
 	
 	}
 	var bidreply BIDREPLY
+	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&bidreply)
 	Log(bidreply)
 	return 0
@@ -175,6 +182,7 @@ func read_bid_bottom(buffer []byte) int {
 	
 	}
 	var  bidbottom BIDBOTTOM
+	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&bidbottom)
 	Log(bidbottom)
 	return 0
@@ -192,6 +200,7 @@ func  read_out_reply(buffer []byte ) int {
 	
 	}
 	var outreply OUTREPLY
+	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&outreply)
 	Log(outreply)
 	return 0
@@ -208,6 +217,7 @@ func  read_game_end(buffer []byte) int {
 		Crc	string  `json:"crc"`
 	}
 	var gameend GAMEEND
+	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&gameend)
 	Log(gameend)
 	return 0
@@ -228,6 +238,7 @@ func  read_result(buffer []byte) int {
 		Crc	string  `json:"crc"`
 	 }
 	 var result RESULT
+	 buffer = []byte(StripHttpStr(string(buffer)))
 	 json.Unmarshal([]byte(buffer),&result)
 	 Log(result)
 	 return 0
@@ -248,6 +259,7 @@ func Read_action_cmd(conn net.Conn)(int,error){
         return  n, err
     }
     var action_cmd ROBOTREQ
+	buffer = []byte(StripHttpStr(string(buffer)))
 	err = json.Unmarshal(buffer,&action_cmd)
 	if err != nil {
 	   return -1,err
@@ -403,6 +415,7 @@ func Read_robot_req(conn net.Conn) (int, error){
         return  n, err
     }
     var robot_req ROBOTREQ
+	buffer = []byte(StripHttpStr(string(buffer)))
     err = json.Unmarshal(buffer,&robot_req)	
 	if robot_req.Type != "rebot_req" {
 	   return -1 ,nil
@@ -436,7 +449,8 @@ func Read_auth_res(conn net.Conn) (int, error){
      if err != nil {  
             Log(conn.RemoteAddr().String(), " connection error: ", err)  
             return  n, err
-     }  
+     } 
+     Log(string(buffer))	 
      	 
      skey2 := "91ylordai2"
 	 type AUTHRES struct {
@@ -447,6 +461,8 @@ func Read_auth_res(conn net.Conn) (int, error){
 	 
 	 }
 	 var auth_res AUTHRES
+	 buffer = []byte(StripHttpStr(string(buffer)))
+	 Log(string(buffer))
 	 err = json.Unmarshal(buffer,&auth_res)
 	 if err != nil {
 	    return -1, err
@@ -496,3 +512,15 @@ func CheckError(err error) {
         os.Exit(1)  
     }  
 } 
+
+
+func StripHttpStr(httpstr string) string{
+     ss :=strings.Split(httpstr, "\x00") 
+     return ss[0]
+     i := strings.Index(httpstr, "{")
+	 b := httpstr[i:]
+	 ii := strings.Index(b,"\n")
+	 return b[:ii]
+
+
+}
