@@ -8,6 +8,7 @@ import (
 	"time"
 	"encoding/json"
 	"strings"
+	"encoding/hex" 
 )  
 const (
     HOSTIPPORT = "0.0.0.0:9900"
@@ -30,12 +31,12 @@ func main() {
         }  
   
         Log(conn.RemoteAddr().String(), " tcp connect success")  
-        handleConnection(conn)  
+        go handleConnection(conn)  
     }  
 }  
 //处理连接  
 func handleConnection(conn net.Conn) {  
-     
+    defer conn.Close()
     Log(conn.RemoteAddr().String())  
     n,err := Send_auth_req(conn)
 	if err != nil || n < 0{
@@ -70,6 +71,7 @@ func handleConnection(conn net.Conn) {
 		n,err = Read_action_cmd(conn)
 		if !(n==0 && err == nil){
 			Log(conn.RemoteAddr().String(),"Read_action_cmd  error number:",n,"error:",err)
+			return
 			
 		}
 	}
@@ -258,60 +260,70 @@ func Read_action_cmd(conn net.Conn)(int,error){
         Log(conn.RemoteAddr().String(), " connection error: ", err)  
         return  n, err
     }
-    var action_cmd ROBOTREQ
-	buffer = []byte(StripHttpStr(string(buffer)))
-	err = json.Unmarshal(buffer,&action_cmd)
-	if err != nil {
-	   return -1,err
-	
-	}
-	switch action_cmd.Type  {
-	    case "robot_abort" :
-	        read_robot_abort(buffer)
-	
-	    case "game_begin" :
-		    read_game_begin(buffer)
+    Log("buffer is ：",string(buffer))
+    Log("hex is :", hex.EncodeToString(buffer[:n]))
+	buffer_str :=  strings.TrimRight(string(buffer[:n]),"\x00")
+	aa := strings.Split(buffer_str,"\x00")
+	Log("len is aa",len(aa))
+    for  _,actionsone := range (aa) {
+		buffer = []byte(strings.TrimSpace(actionsone))
+		Log("bb is:",string(buffer))
+		var action_cmd ROBOTREQ
+
+		err = json.Unmarshal(buffer,&action_cmd)
+		if err != nil {
+		   return -1,err
+
+		}
+		switch action_cmd.Type  {
+			case "robot_abort" :
+				read_robot_abort(buffer)
+
+			case "game_begin" :
+				read_game_begin(buffer)
+				
+			case "play_info" :
+				read_play_info(buffer)
 			
-		case "play_info" :
-		    read_play_info(buffer)
-		
-		case "deal_card" :
-		    read_deal_card(buffer)
+			case "deal_card" :
+				read_deal_card(buffer)
+				
+			case "turn" :
+				read_turn(buffer)
+				
+			case "bid_reply" :
+				read_bid_reply(buffer)
+				n,err = Send_bid_req(conn)
+							Log("send bid req",n,"s",err)
+				if err != nil {
+					 Log(conn.RemoteAddr().String(), "Send_bid_req error number: ",n,"error :", err)  
+					 return  n, err
+				}
+				
+				
+			case "bid_bottom" :
+				read_bid_bottom(buffer)
+				
+			case "out_reply"  :
+				read_out_reply(buffer)
+				n,err = Send_out_req(conn)
+				if err != nil {
+					Log(conn.RemoteAddr().String(), "Send_out_req error number: ",n,"error :", err)  
+					return  n, err
+				}
+				
+			case "game_end" :
+				read_game_end(buffer)
+				
+			case "result" :
+				read_result(buffer)
+				
 			
-		case "turn" :
-		    read_turn(buffer)
-			
-		case "bid_reply" :
-		    read_bid_reply(buffer)
-			n,err = Send_bid_req(conn)
-			if err != nil {
-			     Log(conn.RemoteAddr().String(), "Send_bid_req error number: ",n,"error :", err)  
-                 return  n, err
-			}
-			
-			
-		case "bid_bottom" :
-		    read_bid_bottom(buffer)
-			
-		case "out_reply"  :
-		    read_out_reply(buffer)
-			n,err = Send_out_req(conn)
-			if err != nil {
-			    Log(conn.RemoteAddr().String(), "Send_out_req error number: ",n,"error :", err)  
-                return  n, err
-			}
-			
-		case "game_end" :
-		    read_game_end(buffer)
-			
-		case "result" :
-		    read_result(buffer)
-			
-		
-	
-	
-	
-	
+
+
+
+
+		}
 	}
 	
 	
@@ -334,11 +346,11 @@ func Send_out_req(conn net.Conn)(int ,error){
 	}
 	var out_req OUTREQ
 	out_req.Type = "out_req"
-	out_req.Robot_id = 11121313
+	out_req.Robot_id = 112333434343
 	out_req.Seat = 1
 	out_req.Card = "0"
 	out_req.Time = time.Now().Unix()
-	str := out_req.Type + fmt.Sprintf("%ld",out_req.Robot_id)+fmt.Sprintf("%d",out_req.Seat)+out_req.Card+fmt.Sprintf("%ld",out_req.Time)
+	str := out_req.Type + fmt.Sprintf("%d",out_req.Robot_id)+fmt.Sprintf("%d",out_req.Seat)+out_req.Card+fmt.Sprintf("%d",out_req.Time)
 	out_req.Crc = CalcMd5(str)
 	b_out_req , _ := json.Marshal(out_req)
 	n,err := conn.Write(b_out_req)
@@ -362,11 +374,11 @@ func Send_bid_req(conn net.Conn)(int ,error){
 	}
 	var bid_req BIDREQ
 	bid_req.Type = "bid_req"
-	bid_req.Robot_id = 11121313
+	bid_req.Robot_id = 112333434343
 	bid_req.Seat = 1
 	bid_req.Score = 0
 	bid_req.Time = time.Now().Unix()
-	str := bid_req.Type + fmt.Sprintf("%ld",bid_req.Robot_id)+fmt.Sprintf("%d",bid_req.Seat)+fmt.Sprintf("%d",bid_req.Score)+fmt.Sprintf("%ld",bid_req.Time)
+	str := bid_req.Type + fmt.Sprintf("%d",bid_req.Robot_id)+fmt.Sprintf("%d",bid_req.Seat)+fmt.Sprintf("%d",bid_req.Score)+fmt.Sprintf("%d",bid_req.Time)
 	bid_req.Crc = CalcMd5(str)
 	b_bid_req , _ := json.Marshal(bid_req)
 	n,err := conn.Write(b_bid_req)
@@ -379,23 +391,23 @@ func Send_bid_req(conn net.Conn)(int ,error){
 
 
 func Send_robot_res(conn net.Conn)(int , error){
-   type ROBOTRES struct {
-       Type string `json:"type"`
+	type ROBOTRES struct {
+	   Type string `json:"type"`
 	   Robot_id  int64 `json:"robot_id"`
 	   Time  int64  `json:"time"`
 	   Crc string `json:"crc"`
-   
-   }
-   var robot_res  ROBOTRES
-   robot_res.Type  =  "robot_res"
-   robot_res.Robot_id = 12333434343
-   robot_res.Time = time.Now().Unix()
-   str := robot_res.Type + fmt.Sprintf("%ld",robot_res.Robot_id)+fmt.Sprintf("%ld",robot_res.Time)
-   robot_res.Crc = CalcMd5(str)
-   b , _ :=json.Marshal(robot_res)
-   n,err := conn.Write(b)
-   
-   return n , err
+
+	}
+	var robot_res  ROBOTRES
+	robot_res.Type  =  "robot_res"
+	robot_res.Robot_id = 112333434343
+	robot_res.Time = time.Now().Unix()
+	str := robot_res.Type + fmt.Sprintf("%d",robot_res.Robot_id)+fmt.Sprintf("%d",robot_res.Time)
+	robot_res.Crc = CalcMd5(str)
+	b , _ :=json.Marshal(robot_res)
+	n,err := conn.Write(b)
+
+	return n , err
    
    
 
@@ -416,8 +428,9 @@ func Read_robot_req(conn net.Conn) (int, error){
     }
     var robot_req ROBOTREQ
 	buffer = []byte(StripHttpStr(string(buffer)))
+	Log("robot_req is : ",string(buffer))
     err = json.Unmarshal(buffer,&robot_req)	
-	if robot_req.Type != "rebot_req" {
+	if robot_req.Type != "robot_req" {
 	   return -1 ,nil
 	}
 	
@@ -428,77 +441,77 @@ func Read_robot_req(conn net.Conn) (int, error){
 }
 
 func CalcMd5(str string) string {
-   data := []byte(str)
-   has := md5.Sum(data)
-   md5str1 := fmt.Sprintf("%x", has) //将[]byte转成16进制
-   return md5str1
+	data := []byte(str)
+	has := md5.Sum(data)
+	md5str1 := fmt.Sprintf("%x", has) //将[]byte转成16进制
+	return md5str1
 
 }
 func  Send_auth_succ(conn net.Conn , i_succ  int) (int ,error){
-      s  := `{"type" : "auth_succ"   ,"result" : %d , "time" : %ld, "crc" : "%s"}`
-	  i_time := time.Now().Unix()
-	  hashstr := "auth_succ" + fmt.Sprintf("%d",i_succ)+fmt.Sprintf("%ld",i_time)
-	  n , err := conn.Write([]byte(fmt.Sprintf(s,i_succ,i_time,CalcMd5(hashstr))))
-	  return n ,err
+	s  := `{"type" : "auth_succ"   ,"result" : %d , "time" : %d, "crc" : "%s"}`
+	i_time := time.Now().Unix()
+	hashstr := "auth_succ" + fmt.Sprintf("%d",i_succ)+fmt.Sprintf("%d",i_time)
+	n , err := conn.Write([]byte(fmt.Sprintf(s,i_succ,i_time,CalcMd5(hashstr))))
+	return n ,err
     
 
 }
 func Read_auth_res(conn net.Conn) (int, error){
-     buffer := make([]byte, 2048) 
-	 n, err := conn.Read(buffer) 
-     if err != nil {  
-            Log(conn.RemoteAddr().String(), " connection error: ", err)  
-            return  n, err
-     } 
-     Log(string(buffer))	 
-     	 
-     skey2 := "91ylordai2"
-	 type AUTHRES struct {
-	    Type string `json:"type" bson:"type"`
-		Sign string `json:"sign" bson:"sign"`
-		Time int64  `json:"time" bson:"time"`
-		Crc  string `json:"crc" bson:"crc"`
+	buffer := make([]byte, 2048) 
+	n, err := conn.Read(buffer) 
+	if err != nil {  
+		Log(conn.RemoteAddr().String(), " connection error: ", err)  
+		return  n, err
+	} 
+	Log(string(buffer))	 
 	 
-	 }
-	 var auth_res AUTHRES
-	 buffer = []byte(StripHttpStr(string(buffer)))
-	 Log(string(buffer))
-	 err = json.Unmarshal(buffer,&auth_res)
-	 if err != nil {
-	    return -1, err
-	 }
-	 
-	 if auth_res.Type != "auth_res" {
-	     return -2, nil
-	 }
-	 if auth_res.Sign != CalcMd5("zimakaimen"+skey2) {
-	     return -3, nil
-	 }
-	 
-	 
-	 return 0 , nil
+	skey2 := "91ylordai2"
+	type AUTHRES struct {
+	Type string `json:"type" bson:"type"`
+	Sign string `json:"sign" bson:"sign"`
+	Time int64  `json:"time" bson:"time"`
+	Crc  string `json:"crc" bson:"crc"`
+
+	}
+	var auth_res AUTHRES
+	buffer = []byte(StripHttpStr(string(buffer)))
+	Log(string(buffer))
+	err = json.Unmarshal(buffer,&auth_res)
+	if err != nil {
+	return -1, err
+	}
+
+	if auth_res.Type != "auth_res" {
+	 return -2, nil
+	}
+	if auth_res.Sign != CalcMd5("zimakaimen"+skey2) {
+	 return -3, nil
+	}
+
+
+	return 0 , nil
 	 
 
 }
 
 func Send_auth_req(conn net.Conn) (int ,error){
-     skey1 := "91ylordai"
-     type AUTHREQ struct {
-	    Type string `json:"type" bson:"type"`
-		Sign string `json:"sign" bson:"sign"`
-		Time int64  `json:"time" bson:"time"`
-		Crc  string `json:"crc" bson:"crc"`
-	 
-	 }
-	 var  auth_req AUTHREQ
-	 auth_req.Type = "auth_req"
-	 auth_req.Sign = "zimakaimen"
-	 auth_req.Time = time.Now().Unix()
-	 str_md5 := auth_req.Type + auth_req.Sign + fmt.Sprintf("%ld",auth_req.Time)+skey1
-	 auth_req.Crc = CalcMd5(str_md5)
-	 str_auth_req ,_ := json.Marshal(auth_req)
-	 n,err := conn.Write([]byte(str_auth_req))
-	 return n,err
+	skey1 := "91ylordai"
+	type AUTHREQ struct {
+	Type string `json:"type" bson:"type"`
+	Sign string `json:"sign" bson:"sign"`
+	Time int64  `json:"time" bson:"time"`
+	Crc  string `json:"crc" bson:"crc"`
+
+	}
+	var  auth_req AUTHREQ
+	auth_req.Type = "auth_req"
+	auth_req.Sign = "zimakaimen"
+	auth_req.Time = time.Now().Unix()
+	str_md5 := auth_req.Type + auth_req.Sign + fmt.Sprintf("%d",auth_req.Time)+skey1
+	auth_req.Crc = CalcMd5(str_md5)
+	str_auth_req ,_ := json.Marshal(auth_req)
+	n,err := conn.Write([]byte(str_auth_req))
+	return n,err
 	 
 
 }
@@ -515,12 +528,8 @@ func CheckError(err error) {
 
 
 func StripHttpStr(httpstr string) string{
-     ss :=strings.Split(httpstr, "\x00") 
-     return ss[0]
-     i := strings.Index(httpstr, "{")
-	 b := httpstr[i:]
-	 ii := strings.Index(b,"\n")
-	 return b[:ii]
+	return strings.TrimRight(httpstr,"\x00")
+ 
 
 
 }
