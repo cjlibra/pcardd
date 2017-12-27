@@ -31,6 +31,7 @@ func main() {
         }  
   
         Log(conn.RemoteAddr().String(), " tcp connect success")  
+		conn.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  
         go handleConnection(conn)  
     }  
 }  
@@ -348,7 +349,7 @@ func Send_out_req(conn net.Conn)(int ,error){
 	out_req.Type = "out_req"
 	out_req.Robot_id = 112333434343
 	out_req.Seat = 1
-	out_req.Card = "0"
+	out_req.Card = "黑5红8黑5红8黑5红8黑5红8黑5红8黑5红8黑5红8"
 	out_req.Time = time.Now().Unix()
 	str := out_req.Type + fmt.Sprintf("%d",out_req.Robot_id)+fmt.Sprintf("%d",out_req.Seat)+out_req.Card+fmt.Sprintf("%d",out_req.Time)
 	out_req.Crc = CalcMd5(str)
