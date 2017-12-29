@@ -31,7 +31,9 @@ func main() {
         }  
   
         Log(conn.RemoteAddr().String(), " tcp connect success")  
-		conn.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  
+		
+		 
+		
         go handleConnection(conn)  
     }  
 }  
@@ -256,6 +258,7 @@ func Read_action_cmd(conn net.Conn)(int,error){
 	
 	}
 	buffer := make([]byte, 2048) 
+	conn.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  
 	n, err := conn.Read(buffer) 
     if err != nil {  
         Log(conn.RemoteAddr().String(), " connection error: ", err)  
@@ -421,7 +424,8 @@ func Read_robot_req(conn net.Conn) (int, error){
 	   Crc  string `json:"crc"`
 	
 	}
-	buffer := make([]byte, 2048) 
+	buffer := make([]byte, 2048)
+    conn.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  	
 	n, err := conn.Read(buffer) 
     if err != nil {  
         Log(conn.RemoteAddr().String(), " connection error: ", err)  
@@ -458,6 +462,7 @@ func  Send_auth_succ(conn net.Conn , i_succ  int) (int ,error){
 
 }
 func Read_auth_res(conn net.Conn) (int, error){
+    conn.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  
 	buffer := make([]byte, 2048) 
 	n, err := conn.Read(buffer) 
 	if err != nil {  
