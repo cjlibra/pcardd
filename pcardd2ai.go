@@ -13,6 +13,10 @@ import (
 const (
     HOSTIPPORT = "0.0.0.0:9900"
 	AIHOSTIPPORT = "0.0.0.0:9998"
+	SKEY1AI = "qiansi_ai_1"
+	SKEY2AI = "qiansi_ai_2"
+	skey1 = "91ylordai"
+	skey2 = "91ylordai2"
 
 
 )
@@ -43,18 +47,18 @@ func ai2server(){
 func aihandleConnection(conn net.Conn) {  
     defer conn.Close()
     Log(conn.RemoteAddr().String(),"from ai")  
-    n,err := Send_auth_req(conn)
+    n,err := Send_auth_req(conn ,SKEY1AI)
 	if err != nil || n < 0{
 	    Log(conn.RemoteAddr().String(),"send auth req error number from ai:",n,"error:",err)
 		return
 	}
-	n , err = Read_auth_res(conn )
+	n , err = Read_auth_res(conn ,SKEY2AI ,SKEY1AI)
 	if !(n==0 && err == nil) {
 	   Log(conn.RemoteAddr().String(),"read auth res error number from ai:",n,"error:",err)
-	   Send_auth_succ(conn , 0)
+	   Send_auth_succ(conn , 0,SKEY1AI)
 	   return
 	}
-	n , err = Send_auth_succ(conn , 1)
+	n , err = Send_auth_succ(conn , 1 ,SKEY1AI)
 	if err != nil {
 	    Log(conn.RemoteAddr().String(),"send auth succ error number from ai:",n,"error:",err)
 	    return
@@ -109,12 +113,12 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
     conn1.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  	
 	n, err := conn1.Read(buffer) 
     if err != nil {  
-        Log(conn1.RemoteAddr().String(), "read error: ", err)  
+        Log(conn1.RemoteAddr().String(), "read error1: ", err)  
         return  n, err
     }
 	n , err = conn2.Write(buffer[:n])
 	if err != nil {  
-        Log(conn2.RemoteAddr().String(), " write error: ", err)  
+        Log(conn2.RemoteAddr().String(), " write error1: ", err)  
         return  n, err
     }
 	
@@ -122,12 +126,12 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
 	conn2.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  	
 	n, err = conn2.Read(buffer) 
     if err != nil {  
-        Log(conn2.RemoteAddr().String(), "read error: ", err)  
+        Log(conn2.RemoteAddr().String(), "read error2: ", err)  
         return  n, err
     }
 	n , err = conn1.Write(buffer[:n])
 	if err != nil {  
-        Log(conn1.RemoteAddr().String(), " write error: ", err)  
+        Log(conn1.RemoteAddr().String(), " write error2: ", err)  
         return  n, err
     }
 	
@@ -164,18 +168,18 @@ func main() {
 func handleConnection(conn net.Conn) {  
     defer conn.Close()
     Log(conn.RemoteAddr().String())  
-    n,err := Send_auth_req(conn)
+    n,err := Send_auth_req(conn ,skey1)
 	if err != nil || n < 0{
 	    Log(conn.RemoteAddr().String(),"send auth req error number:",n,"error:",err)
 		return
 	}
-	n , err = Read_auth_res(conn )
+	n , err = Read_auth_res(conn ,skey2,skey1)
 	if !(n==0 && err == nil) {
 	   Log(conn.RemoteAddr().String(),"read auth res error number:",n,"error:",err)
-	   Send_auth_succ(conn , 0)
+	   Send_auth_succ(conn , 0 , skey1)
 	   return
 	}
-	n , err = Send_auth_succ(conn , 1)
+	n , err = Send_auth_succ(conn , 1,skey1)
 	if err != nil {
 	    Log(conn.RemoteAddr().String(),"send auth succ error number:",n,"error:",err)
 	    return
@@ -598,16 +602,16 @@ func CalcMd5(str string) string {
 	return md5str1
 
 }
-func  Send_auth_succ(conn net.Conn , i_succ  int) (int ,error){
+func  Send_auth_succ(conn net.Conn , i_succ  int , key string) (int ,error){
 	s  := `{"type" : "auth_succ"   ,"result" : %d , "time" : %d, "crc" : "%s"}`
 	i_time := time.Now().Unix()
-	hashstr := "auth_succ" + fmt.Sprintf("%d",i_succ)+fmt.Sprintf("%d",i_time)
+	hashstr := "auth_succ" +fmt.Sprintf("%d",i_time)+key
 	n , err := conn.Write([]byte(fmt.Sprintf(s,i_succ,i_time,CalcMd5(hashstr))))
 	return n ,err
     
 
 }
-func Read_auth_res(conn net.Conn) (int, error){
+func Read_auth_res(conn net.Conn , key string , crckey string) (int, error){
     conn.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  
 	buffer := make([]byte, 2048) 
 	n, err := conn.Read(buffer) 
@@ -617,7 +621,7 @@ func Read_auth_res(conn net.Conn) (int, error){
 	} 
 	Log(string(buffer))	 
 	 
-	skey2 := "91ylordai2"
+	skey2 := key
 	type AUTHRES struct {
 	Type string `json:"type" bson:"type"`
 	Sign string `json:"sign" bson:"sign"`
@@ -639,15 +643,18 @@ func Read_auth_res(conn net.Conn) (int, error){
 	if auth_res.Sign != CalcMd5("zimakaimen"+skey2) {
 	 return -3, nil
 	}
-
+    hashstr := auth_res.Type+fmt.Sprintf("%d",auth_res.Time)+crckey
+	if auth_res.Crc != CalcMd5(hashstr ){
+	  return -4, nil
+	}
 
 	return 0 , nil
 	 
 
 }
 
-func Send_auth_req(conn net.Conn) (int ,error){
-	skey1 := "91ylordai"
+func Send_auth_req(conn net.Conn , key string) (int ,error){
+	skey1 := key
 	type AUTHREQ struct {
 	Type string `json:"type" bson:"type"`
 	Sign string `json:"sign" bson:"sign"`
@@ -659,7 +666,7 @@ func Send_auth_req(conn net.Conn) (int ,error){
 	auth_req.Type = "auth_req"
 	auth_req.Sign = "zimakaimen"
 	auth_req.Time = time.Now().Unix()
-	str_md5 := auth_req.Type + auth_req.Sign + fmt.Sprintf("%d",auth_req.Time)+skey1
+	str_md5 := auth_req.Type  + fmt.Sprintf("%d",auth_req.Time)+skey1
 	auth_req.Crc = CalcMd5(str_md5)
 	str_auth_req ,_ := json.Marshal(auth_req)
 	n,err := conn.Write([]byte(str_auth_req))
