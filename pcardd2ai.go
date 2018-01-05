@@ -66,13 +66,17 @@ func aihandleConnection(conn net.Conn) {
 	
 
 	for {
-	
+	    if Conn1 == nil {
+		   time.Sleep(time.Second*10)
+		   continue
+		}
 	
 	    n , err  = exchangesocket(conn,Conn1)
 		if err != nil {
 		
 		     Log(conn.RemoteAddr().String(), "exchange error  from ai: ", err)  
-             return   
+			 time.Sleep(time.Second*2)
+            // return   
 		
 		
 		}
@@ -108,26 +112,31 @@ func aihandleConnection(conn net.Conn) {
 	
 }
 
-func fixCrcOfEx(buffer []byte , readkey string , writekey string) ([]byte , int){
+func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]byte , int){
      type TYPETIMECRC struct {
 	    Type string `json:"type"`
-	    Robot_id int64 `json:"robot_id"`
 	    Time int64 `json:"time"`
 	    Crc string `json:"crc"`
 	 
 	 }
+	 outstring := ""
 	 var typetimecrc TYPETIMECRC
-	 err := json.Unmarshal(buffer , &typetimecrc)
-	 if err != nil {
-	   return   buffer , -1 
-	 
+	 buffer_str := StripHttpStr(string(buffer))
+	 b_strs :=strings.Split(buffer_str,"\x00")
+	 for _,b_str := range b_strs {
+		 err := json.Unmarshal([]byte(b_str) , &typetimecrc)
+		 if err != nil {
+		   Log(buffer_str,err)
+		   return   buffer , -1 
+		 
+		 }
+		 inhash := typetimecrc.Type+fmt.Sprintf("%d",typetimecrc.Time)+ readkey
+		 if  typetimecrc.Crc !=  CalcMd5(inhash) {
+			return   buffer , -2 
+		 }
+		 outhash := typetimecrc.Type+fmt.Sprintf("%d",typetimecrc.Time)+ writekey
+		 outstring = outstring + strings.Replace(b_str,typetimecrc.Crc,CalcMd5(outhash),-1)
 	 }
-	 inhash := typetimecrc.Type+fmt.Sprintf("%d",typetimecrc.Time)+ readkey
-	 if  typetimecrc.Crc !=  CalcMd5(inhash) {
-	    return   buffer , -2 
-	 }
-	 outhash := typetimecrc.Type+fmt.Sprintf("%d",typetimecrc.Time)+ writekey
-	 outstring := strings.Replace(string(buffer),typetimecrc.Crc,CalcMd5(outhash),-1)
 	 return []byte(outstring), 0
 	 
 
@@ -138,14 +147,15 @@ func fixCrcOfEx(buffer []byte , readkey string , writekey string) ([]byte , int)
 func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
     
     buffer := make([]byte, 2048)
-    conn1.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  	
+    conn1.SetReadDeadline(time.Now().Add(time.Duration(2000) * time.Second))  	
 	n, err := conn1.Read(buffer) 
+	Log(string(buffer))
     if err != nil {  
         Log(conn1.RemoteAddr().String(), "read error1: ", err)  
         return  n, err
     }
 	if conn1 == Conn2 {
-	   xbuffer , ret := fixCrcOfEx(buffer[:n],SKEY1AI,skey1)
+	   xbuffer , ret := fixCrcOfEx(buffer,n,SKEY1AI,skey1)
 	   if ret == 0 {
 	      buffer = xbuffer
 	   }else{
@@ -153,7 +163,7 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
 	     return -1, myerr
 	   }
 	}else{
-	    xbuffer , ret := fixCrcOfEx(buffer[:n],skey1,SKEY1AI)
+	    xbuffer , ret := fixCrcOfEx(buffer,n,skey1,SKEY1AI)
 	   if ret == 0 {
 	      buffer = xbuffer
 	   }else{
@@ -211,7 +221,8 @@ var Conn1 net.Conn
 var Conn2 net.Conn 
 func main() {  
   
-//建立socket，监听端口  
+//建立socket，监听端口
+     
     go ai2server()
     netListen, err := net.Listen("tcp", HOSTIPPORT)  
     CheckError(err)  
@@ -256,12 +267,16 @@ func handleConnection(conn net.Conn) {
 	
 	for {
 	
-	
+	    if Conn2 == nil {
+		   time.Sleep(time.Second*10)
+		   continue
+		}
 	    n , err  = exchangesocket(conn,Conn2)
 		if err != nil {
 		
 		     Log(conn.RemoteAddr().String(), "exchange error: ", err)  
-             return   
+			 time.Sleep(time.Second*2)
+            // return   
 		
 		
 		}
