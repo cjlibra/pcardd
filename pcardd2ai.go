@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"strings"
 	"encoding/hex" 
+	"io"
 )  
 const (
     HOSTIPPORT = "0.0.0.0:9900"
@@ -20,24 +21,31 @@ const (
 
 
 )
-
+var linkornot int
 func ai2server(){
     netListen, err := net.Listen("tcp", AIHOSTIPPORT)  
     CheckError(err)  
     defer netListen.Close()  
-  
+    
     Log("Waiting for clients from ai")  
+	i_ai = 0
     for {  
         conn, err := netListen.Accept()  
         if err != nil {  
             continue  
         }  
-  
+        if i_ai != 0 {
+		   conn.Write([]byte("已经有一个连接，请退出后再连"))
+		   Log("ai已经有一个连接，请退出后再连")
+		   conn.Close()
+		   
+		   continue
+		}
         Log(conn.RemoteAddr().String(), " tcp connect success from ai")  
 		
 		Conn2 = conn 
-		
-        aihandleConnection(conn)  
+		linkornot = 0
+        go aihandleConnection(conn)  
     }  
 
 
@@ -45,7 +53,11 @@ func ai2server(){
 }
 
 func aihandleConnection(conn net.Conn) {  
-    defer conn.Close()
+    defer func(){
+		conn.Close()
+		i_ai = 0
+	}()
+	i_ai = 1
     Log(conn.RemoteAddr().String(),"from ai")  
     n,err := Send_auth_req(conn ,SKEY1AI)
 	if err != nil || n < 0{
@@ -70,11 +82,20 @@ func aihandleConnection(conn net.Conn) {
 		   time.Sleep(time.Second*10)
 		   continue
 		}
-	
+	    if linkornot == 1 {
+		   Log("ai stop connection")
+		   return
+		
+		}
 	    n , err  = exchangesocket(conn,Conn1)
 		if err != nil {
 		
 		     Log(conn.RemoteAddr().String(), "exchange error  from ai: ", err)  
+			 if err == io.EOF {
+			    linkornot = 1
+				Log(" ai read io.EOF ,connections failed")
+			    return
+			 }
 			 time.Sleep(time.Second*2)
             // return   
 		
@@ -112,32 +133,33 @@ func aihandleConnection(conn net.Conn) {
 	
 }
 
-func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]byte , int){
+func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]string , int){
      type TYPETIMECRC struct {
 	    Type string `json:"type"`
 	    Time int64 `json:"time"`
 	    Crc string `json:"crc"`
 	 
 	 }
-	 outstring := ""
+	 var outstring  []string
 	 var typetimecrc TYPETIMECRC
 	 buffer_str := StripHttpStr(string(buffer))
 	 b_strs :=strings.Split(buffer_str,"\x00")
 	 for _,b_str := range b_strs {
 		 err := json.Unmarshal([]byte(b_str) , &typetimecrc)
 		 if err != nil {
-		   Log(buffer_str,err)
-		   return   buffer , -1 
+		   Log(b_str,err)
+		   Log(hex.EncodeToString([]byte(b_str)))
+		   return   outstring , -1 
 		 
 		 }
 		 inhash := typetimecrc.Type+fmt.Sprintf("%d",typetimecrc.Time)+ readkey
 		 if  typetimecrc.Crc !=  CalcMd5(inhash) {
-			return   buffer , -2 
+			return   outstring , -2 
 		 }
 		 outhash := typetimecrc.Type+fmt.Sprintf("%d",typetimecrc.Time)+ writekey
-		 outstring = outstring + strings.Replace(b_str,typetimecrc.Crc,CalcMd5(outhash),-1)
+		 outstring = append(outstring, strings.Replace(b_str,typetimecrc.Crc,CalcMd5(outhash),-1))
 	 }
-	 return []byte(outstring), 0
+	 return  outstring , 0
 	 
 
 
@@ -145,9 +167,10 @@ func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]byte 
 }
 
 func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
-    
+    var  xbuffer1 []string
     buffer := make([]byte, 2048)
-    conn1.SetReadDeadline(time.Now().Add(time.Duration(2000) * time.Second))  	
+    conn1.SetReadDeadline(time.Now().Add(time.Duration(2000) * time.Second))  
+    
 	n, err := conn1.Read(buffer) 
 	Log(string(buffer))
     if err != nil {  
@@ -156,28 +179,39 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
     }
 	if conn1 == Conn2 {
 	   xbuffer , ret := fixCrcOfEx(buffer,n,SKEY1AI,skey1)
-	   if ret == 0 {
-	      buffer = xbuffer
-	   }else{
+	   if ret != 0 {
+	       
 	     myerr := fmt.Errorf("%s ,ret=%d", "fixCrcOfEx" ,ret)
 	     return -1, myerr
 	   }
+	   xbuffer1  = xbuffer
 	}else{
 	    xbuffer , ret := fixCrcOfEx(buffer,n,skey1,SKEY1AI)
-	   if ret == 0 {
-	      buffer = xbuffer
-	   }else{
+	   if ret != 0 {
+	      
 	     myerr := fmt.Errorf("%s ,ret=%d", "fixCrcOfEx" ,ret)
 	     return  -1, myerr
 	   }
-	   
+	    xbuffer1  = xbuffer
 	
 	}
-	n , err = conn2.Write(buffer[:n])
-	if err != nil {  
-        Log(conn2.RemoteAddr().String(), " write error1: ", err)  
-        return  n, err
-    }
+	
+	for _,xbuf := range xbuffer1 {
+	    if conn1 == Conn2 {
+		   conn2 = Conn1
+		}else{
+		   conn2 = Conn2
+		}
+	    n , err = conn2.Write([]byte(xbuf))
+	    time.Sleep(time. Millisecond * 100)
+	    Log(xbuf,n)
+	
+	
+		if err != nil {  
+			Log(conn2.RemoteAddr().String(), " write error1: ", err)  
+			return  n, err
+		}
+	}
 	
 	
 /*	conn2.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  	
@@ -219,6 +253,8 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
 }
 var Conn1 net.Conn 
 var Conn2 net.Conn 
+var i_ai int
+var i_fuyun int
 func main() {  
   
 //建立socket，监听端口
@@ -229,22 +265,34 @@ func main() {
     defer netListen.Close()  
   
     Log("Waiting for clients")  
+	i_fuyun = 0
     for {  
         conn, err := netListen.Accept()  
         if err != nil {  
             continue  
         }  
-  
+        if i_fuyun != 0 {
+		   conn.Write([]byte("已经有一个连接，请退出后再连"))
+		   Log("fuyun已经有一个连接，请退出后再连")
+		   conn.Close()
+		   
+		   continue
+		}
         Log(conn.RemoteAddr().String(), " tcp connect success")  
 		
 		 
 		Conn1 = conn
-        handleConnection(conn)  
+		linkornot = 0
+        go handleConnection(conn)  
     }  
 }  
 //处理连接  
 func handleConnection(conn net.Conn) {  
-    defer conn.Close()
+    defer func(){
+	   conn.Close()
+	   i_fuyun = 0
+	}()
+	i_fuyun = 1
     Log(conn.RemoteAddr().String())  
     n,err := Send_auth_req(conn ,skey1)
 	if err != nil || n < 0{
@@ -271,10 +319,21 @@ func handleConnection(conn net.Conn) {
 		   time.Sleep(time.Second*10)
 		   continue
 		}
+		if linkornot == 1 {
+		   Log("fuyun stop connection")
+		   return
+		
+		}
+		
 	    n , err  = exchangesocket(conn,Conn2)
 		if err != nil {
 		
 		     Log(conn.RemoteAddr().String(), "exchange error: ", err)  
+			 if err == io.EOF {
+			    linkornot = 1
+				Log("fuyun read io.EOF ,connections failed")
+			    return
+			 }
 			 time.Sleep(time.Second*2)
             // return   
 		
