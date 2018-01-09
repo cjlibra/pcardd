@@ -80,6 +80,7 @@ func aihandleConnection(conn net.Conn) {
 	for {
 	    if Conn1 == nil {
 		   time.Sleep(time.Second*10)
+		   Log(" ai Conn1 == nil")
 		   continue
 		}
 	    if linkornot == 1 {
@@ -135,9 +136,9 @@ func aihandleConnection(conn net.Conn) {
 
 func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]string , int){
      type TYPETIMECRC struct {
-	    Type string `json:"type"`
-	    Time int64 `json:"time"`
-	    Crc string `json:"crc"`
+	    Type string `json:"type" bson:"type"`
+	    Time int64 `json:"time" bson:"time"`
+	    Crc string `json:"crc" bson:"crc"`
 	 
 	 }
 	 var outstring  []string
@@ -149,6 +150,8 @@ func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]strin
 		 if err != nil {
 		   Log(b_str,err)
 		   Log(hex.EncodeToString([]byte(b_str)))
+		   Log(buffer_str)
+		   Log(hex.EncodeToString([]byte(buffer_str)))
 		   return   outstring , -1 
 		 
 		 }
@@ -317,6 +320,7 @@ func handleConnection(conn net.Conn) {
 	
 	    if Conn2 == nil {
 		   time.Sleep(time.Second*10)
+		   Log(" fuyun Conn2 == nil")
 		   continue
 		}
 		if linkornot == 1 {
@@ -773,6 +777,7 @@ func Read_auth_res(conn net.Conn , key string , crckey string) (int, error){
 	var auth_res AUTHRES
 	buffer = []byte(StripHttpStr(string(buffer)))
 	Log(string(buffer))
+	Log(hex.EncodeToString([]byte(buffer)))
 	err = json.Unmarshal(buffer,&auth_res)
 	if err != nil {
 	return -1, err
