@@ -3,13 +3,16 @@ import (
     "crypto/md5"
     "fmt"  
     "net"  
-    "log"  
+  //  "log"  
     "os"  
 	"time"
 	"encoding/json"
 	"strings"
 	"encoding/hex" 
 	"io"
+	"github.com/golang/glog"
+	"flag"
+	
 )  
 const (
     HOSTIPPORT = "0.0.0.0:9900"
@@ -144,7 +147,9 @@ func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]strin
 	 var outstring  []string
 	 var typetimecrc TYPETIMECRC
 	 buffer_str := StripHttpStr(string(buffer))
-	 b_strs :=strings.Split(buffer_str,"\x00")
+	 buffer_strs :=strings.Replace(buffer_str,"}{","}\x00{",-1)
+	 buffer_strs =strings.Replace(buffer_strs,"}\x0a{","}\x00{",-1)
+	 b_strs :=strings.Split(buffer_strs,"\x00")
 	 for _,b_str := range b_strs {
 		 err := json.Unmarshal([]byte(b_str) , &typetimecrc)
 		 if err != nil {
@@ -157,6 +162,7 @@ func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]strin
 		 }
 		 inhash := typetimecrc.Type+fmt.Sprintf("%d",typetimecrc.Time)+ readkey
 		 if  typetimecrc.Crc !=  CalcMd5(inhash) {
+		    Log(b_str)
 			return   outstring , -2 
 		 }
 		 outhash := typetimecrc.Type+fmt.Sprintf("%d",typetimecrc.Time)+ writekey
@@ -171,7 +177,7 @@ func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]strin
 
 func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
     var  xbuffer1 []string
-    buffer := make([]byte, 2048)
+    buffer := make([]byte, 20480)
     conn1.SetReadDeadline(time.Now().Add(time.Duration(2000) * time.Second))  
     
 	n, err := conn1.Read(buffer) 
@@ -261,7 +267,11 @@ var i_fuyun int
 func main() {  
   
 //建立socket，监听端口
-     
+	defer func(){
+	    glog.Flush()
+	}()
+    flag.Parse() 
+	
     go ai2server()
     netListen, err := net.Listen("tcp", HOSTIPPORT)  
     CheckError(err)  
@@ -552,7 +562,7 @@ func Read_action_cmd(conn net.Conn)(int,error){
 	   Crc  string `json:"crc"`
 	
 	}
-	buffer := make([]byte, 2048) 
+	buffer := make([]byte, 20480) 
 	conn.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  
 	n, err := conn.Read(buffer) 
     if err != nil {  
@@ -719,7 +729,7 @@ func Read_robot_req(conn net.Conn) (int, error){
 	   Crc  string `json:"crc"`
 	
 	}
-	buffer := make([]byte, 2048)
+	buffer := make([]byte, 20480)
     conn.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  	
 	n, err := conn.Read(buffer) 
     if err != nil {  
@@ -758,7 +768,7 @@ func  Send_auth_succ(conn net.Conn , i_succ  int , key string) (int ,error){
 }
 func Read_auth_res(conn net.Conn , key string , crckey string) (int, error){
     conn.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  
-	buffer := make([]byte, 2048) 
+	buffer := make([]byte, 20480) 
 	n, err := conn.Read(buffer) 
 	if err != nil {  
 		Log(conn.RemoteAddr().String(), " connection error: ", err)  
@@ -821,7 +831,8 @@ func Send_auth_req(conn net.Conn , key string) (int ,error){
 
 }
 func Log(v ...interface{}) {  
-    log.Println(v...)  
+ //   log.Println(v...) 
+    glog.V(2).Infoln(v...)	
 }  
   
 func CheckError(err error) {  
