@@ -95,9 +95,9 @@ func aihandleConnection(conn net.Conn) {
 		if err != nil {
 		
 		     Log(conn.RemoteAddr().String(), "exchange error  from ai: ", err)  
-			 if err == io.EOF {
+			 if err == io.EOF || n == -99 {
 			    linkornot = 1
-				Log(" ai read io.EOF ,connections failed")
+				Log(" ai read io.EOF or n== -99,connections failed" , n)
 			    return
 			 }
 			 time.Sleep(time.Second*2)
@@ -184,7 +184,7 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
 	Log(string(buffer))
     if err != nil {  
         Log(conn1.RemoteAddr().String(), "read error1: ", err)  
-        return  n, err
+        return  -99, err
     }
 	if conn1 == Conn2 {
 	   xbuffer , ret := fixCrcOfEx(buffer,n,SKEY1AI,skey1)
@@ -218,7 +218,7 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
 	
 		if err != nil {  
 			Log(conn2.RemoteAddr().String(), " write error1: ", err)  
-			return  n, err
+			return  -99, err
 		}
 	}
 	
@@ -343,9 +343,9 @@ func handleConnection(conn net.Conn) {
 		if err != nil {
 		
 		     Log(conn.RemoteAddr().String(), "exchange error: ", err)  
-			 if err == io.EOF {
+			 if err == io.EOF || n == -99{
 			    linkornot = 1
-				Log("fuyun read io.EOF ,connections failed")
+				Log("fuyun read io.EOF or n==-99,connections failed",n)
 			    return
 			 }
 			 time.Sleep(time.Second*2)
@@ -774,7 +774,7 @@ func Read_auth_res(conn net.Conn , key string , crckey string) (int, error){
 		Log(conn.RemoteAddr().String(), " connection error: ", err)  
 		return  n, err
 	} 
-	Log(string(buffer))	 
+	//Log(string(buffer))	 
 	 
 	skey2 := key
 	type AUTHRES struct {
@@ -787,7 +787,7 @@ func Read_auth_res(conn net.Conn , key string , crckey string) (int, error){
 	var auth_res AUTHRES
 	buffer = []byte(StripHttpStr(string(buffer)))
 	Log(string(buffer))
-	Log(hex.EncodeToString([]byte(buffer)))
+	//Log(hex.EncodeToString([]byte(buffer)))
 	err = json.Unmarshal(buffer,&auth_res)
 	if err != nil {
 	return -1, err
