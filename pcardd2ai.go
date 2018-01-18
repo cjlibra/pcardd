@@ -30,7 +30,7 @@ func ai2server(){
     CheckError(err)  
     defer netListen.Close()  
     
-    Log("Waiting for clients from ai")  
+    glog.V(2).Infoln("Waiting for clients from ai")  
 	i_ai = 0
     for {  
         conn, err := netListen.Accept()  
@@ -38,13 +38,13 @@ func ai2server(){
             continue  
         }  
         if i_ai != 0 {
-		   conn.Write([]byte("已经有一个连接，请退出后再连"))
-		   Log("ai已经有一个连接，请退出后再连")
+		   conn.Write([]byte("you has another connection existed ,please close that!!!---已经有一个连接，请退出后再连"))
+		   glog.V(2).Infoln("ai已经有一个连接，请退出后再连")
 		   conn.Close()
 		   
 		   continue
 		}
-        Log(conn.RemoteAddr().String(), " tcp connect success from ai")  
+        glog.V(2).Infoln(conn.RemoteAddr().String(), " tcp connect success from ai")  
 		
 		Conn2 = conn 
 		linkornot = 0
@@ -61,21 +61,21 @@ func aihandleConnection(conn net.Conn) {
 		i_ai = 0
 	}()
 	i_ai = 1
-    Log(conn.RemoteAddr().String(),"from ai")  
+    glog.V(2).Infoln(conn.RemoteAddr().String(),"from ai")  
     n,err := Send_auth_req(conn ,SKEY1AI)
 	if err != nil || n < 0{
-	    Log(conn.RemoteAddr().String(),"send auth req error number from ai:",n,"error:",err)
+	    glog.V(2).Infoln(conn.RemoteAddr().String(),"send auth req error number from ai:",n,"error:",err)
 		return
 	}
 	n , err = Read_auth_res(conn ,SKEY2AI ,SKEY1AI)
 	if !(n==0 && err == nil) {
-	   Log(conn.RemoteAddr().String(),"read auth res error number from ai:",n,"error:",err)
+	   glog.V(2).Infoln(conn.RemoteAddr().String(),"read auth res error number from ai:",n,"error:",err)
 	   Send_auth_succ(conn , 0,SKEY1AI)
 	   return
 	}
 	n , err = Send_auth_succ(conn , 1 ,SKEY1AI)
 	if err != nil {
-	    Log(conn.RemoteAddr().String(),"send auth succ error number from ai:",n,"error:",err)
+	    glog.V(2).Infoln(conn.RemoteAddr().String(),"send auth succ error number from ai:",n,"error:",err)
 	    return
 	}
 	
@@ -83,21 +83,21 @@ func aihandleConnection(conn net.Conn) {
 	for {
 	    if Conn1 == nil {
 		   time.Sleep(time.Second*10)
-		   Log(" ai Conn1 == nil")
+		   glog.V(2).Infoln(" ai Conn1 == nil")
 		   continue
 		}
 	    if linkornot == 1 {
-		   Log("ai stop connection")
+		   glog.V(2).Infoln("ai stop connection")
 		   return
 		
 		}
 	    n , err  = exchangesocket(conn,Conn1)
 		if err != nil {
 		
-		     Log(conn.RemoteAddr().String(), "exchange error  from ai: ", err)  
+		     glog.V(2).Infoln(conn.RemoteAddr().String(), "exchange error  from ai: ", err)  
 			 if err == io.EOF || n == -99 {
 			    linkornot = 1
-				Log(" ai read io.EOF or n== -99,connections failed" , n)
+				glog.V(2).Infoln(" ai read io.EOF or n== -99,connections failed" , n)
 			    return
 			 }
 			 time.Sleep(time.Second*2)
@@ -115,20 +115,20 @@ func aihandleConnection(conn net.Conn) {
 	/*
 	n,err = Read_robot_req(conn )
 	if !(n==0 && err == nil) {
-	     Log(conn.RemoteAddr().String(),"read robot req  error number:",n,"error:",err)
+	     glog.V(2).Infoln(conn.RemoteAddr().String(),"read robot req  error number:",n,"error:",err)
 		 return
 	}
 	
 	n,err = Send_robot_res(conn)
 	if  err != nil {
-	    Log(conn.RemoteAddr().String(),"send robot res  error number:",n,"error:",err)
+	    glog.V(2).Infoln(conn.RemoteAddr().String(),"send robot res  error number:",n,"error:",err)
 		return
 	
 	}
 	for {
 		n,err = Read_action_cmd(conn)
 		if !(n==0 && err == nil){
-			Log(conn.RemoteAddr().String(),"Read_action_cmd  error number:",n,"error:",err)
+			glog.V(2).Infoln(conn.RemoteAddr().String(),"Read_action_cmd  error number:",n,"error:",err)
 			return
 			
 		}
@@ -153,16 +153,16 @@ func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]strin
 	 for _,b_str := range b_strs {
 		 err := json.Unmarshal([]byte(b_str) , &typetimecrc)
 		 if err != nil {
-		   Log(b_str,err)
-		   Log(hex.EncodeToString([]byte(b_str)))
-		   Log(buffer_str)
-		   Log(hex.EncodeToString([]byte(buffer_str)))
+		   glog.V(2).Infoln(b_str,err)
+		   glog.V(2).Infoln(hex.EncodeToString([]byte(b_str)))
+		   glog.V(2).Infoln(buffer_str)
+		   glog.V(2).Infoln(hex.EncodeToString([]byte(buffer_str)))
 		   return   outstring , -1 
 		 
 		 }
 		 inhash := typetimecrc.Type+fmt.Sprintf("%d",typetimecrc.Time)+ readkey
 		 if  typetimecrc.Crc !=  CalcMd5(inhash) {
-		    Log(b_str)
+		    glog.V(2).Infoln(b_str)
 			return   outstring , -2 
 		 }
 		 outhash := typetimecrc.Type+fmt.Sprintf("%d",typetimecrc.Time)+ writekey
@@ -178,12 +178,12 @@ func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]strin
 func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
     var  xbuffer1 []string
     buffer := make([]byte, 20480)
-    conn1.SetReadDeadline(time.Now().Add(time.Duration(2000) * time.Second))  
+    conn1.SetReadDeadline(time.Now().Add(time.Duration(100) * time.Second))  
     
 	n, err := conn1.Read(buffer) 
-	Log(string(buffer))
+	glog.V(2).Infoln(string(buffer))
     if err != nil {  
-        Log(conn1.RemoteAddr().String(), "read error1: ", err)  
+        glog.V(2).Infoln(conn1.RemoteAddr().String(), "read error1: ", err)  
         return  -99, err
     }
 	if conn1 == Conn2 {
@@ -213,11 +213,11 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
 		}
 	    n , err = conn2.Write([]byte(xbuf))
 	    time.Sleep(time. Millisecond * 100)
-	    Log(xbuf,n)
+	    glog.V(2).Infoln(xbuf,n)
 	
 	
 		if err != nil {  
-			Log(conn2.RemoteAddr().String(), " write error1: ", err)  
+			glog.V(2).Infoln(conn2.RemoteAddr().String(), " write error1: ", err)  
 			return  -99, err
 		}
 	}
@@ -226,7 +226,7 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
 /*	conn2.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  	
 	n, err = conn2.Read(buffer) 
     if err != nil {  
-        Log(conn2.RemoteAddr().String(), "read error2: ", err)  
+        glog.V(2).Infoln(conn2.RemoteAddr().String(), "read error2: ", err)  
         return  n, err
     }
 	if conn1 == Conn2 {
@@ -249,7 +249,7 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
 	}
     n , err = conn1.Write(buffer[:n])
 	if err != nil {  
-        Log(conn1.RemoteAddr().String(), " write error2: ", err)  
+        glog.V(2).Infoln(conn1.RemoteAddr().String(), " write error2: ", err)  
         return  n, err
     }
 	
@@ -277,7 +277,7 @@ func main() {
     CheckError(err)  
     defer netListen.Close()  
   
-    Log("Waiting for clients")  
+    glog.V(2).Infoln("Waiting for clients")  
 	i_fuyun = 0
     for {  
         conn, err := netListen.Accept()  
@@ -285,13 +285,14 @@ func main() {
             continue  
         }  
         if i_fuyun != 0 {
-		   conn.Write([]byte("已经有一个连接，请退出后再连"))
-		   Log("fuyun已经有一个连接，请退出后再连")
+		   conn.Write([]byte("you has another connection existed ,please close that!!!---已经有一个连接，请退出后再连"))
+		   glog.V(2).Infoln("fuyun已经有一个连接，请退出后再连")
+		   time.Sleep(time.Second*60)
 		   conn.Close()
 		   
 		   continue
 		}
-        Log(conn.RemoteAddr().String(), " tcp connect success")  
+        glog.V(2).Infoln(conn.RemoteAddr().String(), " tcp connect success")  
 		
 		 
 		Conn1 = conn
@@ -306,21 +307,21 @@ func handleConnection(conn net.Conn) {
 	   i_fuyun = 0
 	}()
 	i_fuyun = 1
-    Log(conn.RemoteAddr().String())  
+    glog.V(2).Infoln(conn.RemoteAddr().String())  
     n,err := Send_auth_req(conn ,skey1)
 	if err != nil || n < 0{
-	    Log(conn.RemoteAddr().String(),"send auth req error number:",n,"error:",err)
+	    glog.V(2).Infoln(conn.RemoteAddr().String(),"send auth req error number:",n,"error:",err)
 		return
 	}
 	n , err = Read_auth_res(conn ,skey2,skey1)
 	if !(n==0 && err == nil) {
-	   Log(conn.RemoteAddr().String(),"read auth res error number:",n,"error:",err)
+	   glog.V(2).Infoln(conn.RemoteAddr().String(),"read auth res error number:",n,"error:",err)
 	   Send_auth_succ(conn , 0 , skey1)
 	   return
 	}
 	n , err = Send_auth_succ(conn , 1,skey1)
 	if err != nil {
-	    Log(conn.RemoteAddr().String(),"send auth succ error number:",n,"error:",err)
+	    glog.V(2).Infoln(conn.RemoteAddr().String(),"send auth succ error number:",n,"error:",err)
 	    return
 	}
 	
@@ -330,11 +331,11 @@ func handleConnection(conn net.Conn) {
 	
 	    if Conn2 == nil {
 		   time.Sleep(time.Second*10)
-		   Log(" fuyun Conn2 == nil")
+		   glog.V(2).Infoln(" fuyun Conn2 == nil")
 		   continue
 		}
 		if linkornot == 1 {
-		   Log("fuyun stop connection")
+		   glog.V(2).Infoln("fuyun stop connection")
 		   return
 		
 		}
@@ -342,10 +343,10 @@ func handleConnection(conn net.Conn) {
 	    n , err  = exchangesocket(conn,Conn2)
 		if err != nil {
 		
-		     Log(conn.RemoteAddr().String(), "exchange error: ", err)  
+		     glog.V(2).Infoln(conn.RemoteAddr().String(), "exchange error: ", err)  
 			 if err == io.EOF || n == -99{
 			    linkornot = 1
-				Log("fuyun read io.EOF or n==-99,connections failed",n)
+				glog.V(2).Infoln("fuyun read io.EOF or n==-99,connections failed",n)
 			    return
 			 }
 			 time.Sleep(time.Second*2)
@@ -363,13 +364,13 @@ func handleConnection(conn net.Conn) {
 	
 	n,err = Read_robot_req(conn )
 	if !(n==0 && err == nil) {
-	     Log(conn.RemoteAddr().String(),"read robot req  error number:",n,"error:",err)
+	     glog.V(2).Infoln(conn.RemoteAddr().String(),"read robot req  error number:",n,"error:",err)
 		 return
 	}
 	
 	n,err = Send_robot_res(conn)
 	if  err != nil {
-	    Log(conn.RemoteAddr().String(),"send robot res  error number:",n,"error:",err)
+	    glog.V(2).Infoln(conn.RemoteAddr().String(),"send robot res  error number:",n,"error:",err)
 		return
 	
 	}*/
@@ -378,7 +379,7 @@ func handleConnection(conn net.Conn) {
 	for {
 		n,err = Read_action_cmd(conn)
 		if !(n==0 && err == nil){
-			Log(conn.RemoteAddr().String(),"Read_action_cmd  error number:",n,"error:",err)
+			glog.V(2).Infoln(conn.RemoteAddr().String(),"Read_action_cmd  error number:",n,"error:",err)
 			return
 			
 		}
@@ -396,7 +397,7 @@ func  read_robot_abort(buffer []byte) int {
 	var robotabort ROBOTABORT
 	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&robotabort)
-	Log(robotabort)
+	glog.V(2).Infoln(robotabort)
 	return 0
 }
 func  read_game_begin(buffer []byte) int {
@@ -409,7 +410,7 @@ func  read_game_begin(buffer []byte) int {
 	var gamebegin GAMEBEGIN
 	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&gamebegin)
-	Log(gamebegin)
+	glog.V(2).Infoln(gamebegin)
 	return 0
 }
 			
@@ -424,7 +425,7 @@ func  read_play_info(buffer []byte ) int {
 	var  playinfo PLAYINFO
 	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&playinfo)
-	Log(playinfo)
+	glog.V(2).Infoln(playinfo)
 	return 0
 }
 		
@@ -439,7 +440,7 @@ func  read_deal_card(buffer []byte ) int {
 	var dealcard DEALCARD
 	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&dealcard)
-	Log(dealcard)
+	glog.V(2).Infoln(dealcard)
 	return 0
 }
 			
@@ -457,7 +458,7 @@ func  read_turn(buffer []byte) int {
 	var turnturn TURN
 	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&turnturn)
-	Log(turnturn)
+	glog.V(2).Infoln(turnturn)
 	return 0
 }
 			
@@ -475,7 +476,7 @@ func  read_bid_reply(buffer []byte) int {
 	var bidreply BIDREPLY
 	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&bidreply)
-	Log(bidreply)
+	glog.V(2).Infoln(bidreply)
 	return 0
 }
 			
@@ -494,7 +495,7 @@ func read_bid_bottom(buffer []byte) int {
 	var  bidbottom BIDBOTTOM
 	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&bidbottom)
-	Log(bidbottom)
+	glog.V(2).Infoln(bidbottom)
 	return 0
 	
 }
@@ -512,7 +513,7 @@ func  read_out_reply(buffer []byte ) int {
 	var outreply OUTREPLY
 	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&outreply)
-	Log(outreply)
+	glog.V(2).Infoln(outreply)
 	return 0
 }
  			
@@ -529,7 +530,7 @@ func  read_game_end(buffer []byte) int {
 	var gameend GAMEEND
 	buffer = []byte(StripHttpStr(string(buffer)))
 	json.Unmarshal([]byte(buffer),&gameend)
-	Log(gameend)
+	glog.V(2).Infoln(gameend)
 	return 0
 }
 
@@ -550,7 +551,7 @@ func  read_result(buffer []byte) int {
 	 var result RESULT
 	 buffer = []byte(StripHttpStr(string(buffer)))
 	 json.Unmarshal([]byte(buffer),&result)
-	 Log(result)
+	 glog.V(2).Infoln(result)
 	 return 0
 
 
@@ -566,17 +567,17 @@ func Read_action_cmd(conn net.Conn)(int,error){
 	conn.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  
 	n, err := conn.Read(buffer) 
     if err != nil {  
-        Log(conn.RemoteAddr().String(), " connection error: ", err)  
+        glog.V(2).Infoln(conn.RemoteAddr().String(), " connection error: ", err)  
         return  n, err
     }
-    Log("buffer is ：",string(buffer))
-    Log("hex is :", hex.EncodeToString(buffer[:n]))
+    glog.V(2).Infoln("buffer is ：",string(buffer))
+    glog.V(2).Infoln("hex is :", hex.EncodeToString(buffer[:n]))
 	buffer_str :=  strings.TrimRight(string(buffer[:n]),"\x00")
 	aa := strings.Split(buffer_str,"\x00")
-	Log("len is aa",len(aa))
+	glog.V(2).Infoln("len is aa",len(aa))
     for  _,actionsone := range (aa) {
 		buffer = []byte(strings.TrimSpace(actionsone))
-		Log("bb is:",string(buffer))
+		glog.V(2).Infoln("bb is:",string(buffer))
 		var action_cmd ROBOTREQ
 
 		err = json.Unmarshal(buffer,&action_cmd)
@@ -603,9 +604,9 @@ func Read_action_cmd(conn net.Conn)(int,error){
 			case "bid_reply" :
 				read_bid_reply(buffer)
 				n,err = Send_bid_req(conn)
-							Log("send bid req",n,"s",err)
+							glog.V(2).Infoln("send bid req",n,"s",err)
 				if err != nil {
-					 Log(conn.RemoteAddr().String(), "Send_bid_req error number: ",n,"error :", err)  
+					 glog.V(2).Infoln(conn.RemoteAddr().String(), "Send_bid_req error number: ",n,"error :", err)  
 					 return  n, err
 				}
 				
@@ -617,7 +618,7 @@ func Read_action_cmd(conn net.Conn)(int,error){
 				read_out_reply(buffer)
 				n,err = Send_out_req(conn)
 				if err != nil {
-					Log(conn.RemoteAddr().String(), "Send_out_req error number: ",n,"error :", err)  
+					glog.V(2).Infoln(conn.RemoteAddr().String(), "Send_out_req error number: ",n,"error :", err)  
 					return  n, err
 				}
 				
@@ -733,12 +734,12 @@ func Read_robot_req(conn net.Conn) (int, error){
     conn.SetReadDeadline(time.Now().Add(time.Duration(20) * time.Second))  	
 	n, err := conn.Read(buffer) 
     if err != nil {  
-        Log(conn.RemoteAddr().String(), " connection error: ", err)  
+        glog.V(2).Infoln(conn.RemoteAddr().String(), " connection error: ", err)  
         return  n, err
     }
     var robot_req ROBOTREQ
 	buffer = []byte(StripHttpStr(string(buffer)))
-	Log("robot_req is : ",string(buffer))
+	glog.V(2).Infoln("robot_req is : ",string(buffer))
     err = json.Unmarshal(buffer,&robot_req)	
 	if robot_req.Type != "robot_req" {
 	   return -1 ,nil
@@ -771,10 +772,10 @@ func Read_auth_res(conn net.Conn , key string , crckey string) (int, error){
 	buffer := make([]byte, 20480) 
 	n, err := conn.Read(buffer) 
 	if err != nil {  
-		Log(conn.RemoteAddr().String(), " connection error: ", err)  
+		glog.V(2).Infoln(conn.RemoteAddr().String(), " connection error: ", err)  
 		return  n, err
 	} 
-	//Log(string(buffer))	 
+	//glog.V(2).Infoln(string(buffer))	 
 	 
 	skey2 := key
 	type AUTHRES struct {
@@ -786,8 +787,8 @@ func Read_auth_res(conn net.Conn , key string , crckey string) (int, error){
 	}
 	var auth_res AUTHRES
 	buffer = []byte(StripHttpStr(string(buffer)))
-	Log(string(buffer))
-	//Log(hex.EncodeToString([]byte(buffer)))
+	glog.V(2).Infoln(string(buffer))
+	//glog.V(2).Infoln(hex.EncodeToString([]byte(buffer)))
 	err = json.Unmarshal(buffer,&auth_res)
 	if err != nil {
 	return -1, err
@@ -830,10 +831,7 @@ func Send_auth_req(conn net.Conn , key string) (int ,error){
 	 
 
 }
-func Log(v ...interface{}) {  
- //   log.Println(v...) 
-    glog.V(2).Infoln(v...)	
-}  
+   
   
 func CheckError(err error) {  
     if err != nil {  
