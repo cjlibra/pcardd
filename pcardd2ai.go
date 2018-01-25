@@ -78,7 +78,7 @@ func aihandleConnection(conn net.Conn) {
 	    glog.V(2).Infoln(conn.RemoteAddr().String(),"send auth succ error number from ai:",n,"error:",err)
 	    return
 	}
-	
+	go start_send_heart_req(conn   , SKEY1AI)
 
 	for {
 	    if Conn1 == nil {
@@ -160,6 +160,7 @@ func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]strin
 		   return   outstring , -1 
 		 
 		 }
+		 
 		 inhash := typetimecrc.Type+fmt.Sprintf("%d",typetimecrc.Time)+ readkey
 		 if  typetimecrc.Crc !=  CalcMd5(inhash) {
 		    glog.V(2).Infoln(b_str)
@@ -182,6 +183,15 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
     
 	n, err := conn1.Read(buffer) 
 	glog.V(2).Infoln(string(buffer))
+	var readkey  string
+	if conn1 == Conn2 {
+	   readkey = SKEY1AI
+	}else{
+	   readkey = skey1
+	}
+	if check_heart_res(buffer ,readkey) != 0 {
+	    return  -99 , fmt.Errorf("%s : heart res error" , conn1.RemoteAddr().String())
+	}
     if err != nil {  
         glog.V(2).Infoln(conn1.RemoteAddr().String(), "read error1: ", err)  
         return  -99, err
@@ -260,12 +270,73 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
 
 
 }
+var ch_heart chan int
+func check_heart_res(buffer []byte ,readkey string)  int {
+     type TYPETIMECRC struct {
+	    Type string `json:"type" bson:"type"`
+	    Time int64 `json:"time" bson:"time"`
+	    Crc string `json:"crc" bson:"crc"`
+	 
+	 }
+     var typetimecrc TYPETIMECRC
+	 buffer_str := StripHttpStr(string(buffer))
+	 buffer_strs :=strings.Replace(buffer_str,"}{","}\x00{",-1)
+	 buffer_strs =strings.Replace(buffer_strs,"}\x0a{","}\x00{",-1)
+	 b_strs :=strings.Split(buffer_strs,"\x00")
+	 for _,b_str := range b_strs {
+		 err := json.Unmarshal([]byte(b_str) , &typetimecrc)
+		 if err != nil {
+		   glog.V(2).Infoln(b_str,err)
+		   glog.V(2).Infoln(hex.EncodeToString([]byte(b_str)))
+		   glog.V(2).Infoln(buffer_str)
+		   glog.V(2).Infoln(hex.EncodeToString([]byte(buffer_str)))
+		   return     -1 
+		 
+		 }
+		 
+		 if typetimecrc.Type != "heart_res" {
+		     continue
+		 }
+		 
+		 inhash := typetimecrc.Type+fmt.Sprintf("%d",typetimecrc.Time)+ readkey
+		 if  typetimecrc.Crc !=  CalcMd5(inhash) {
+		    glog.V(2).Infoln(b_str)
+			return     -2 
+		 }
+		 ch_heart <- 1
+		 
+	 }
+     return 0
+
+}
+
+func check_ch_heart(){
+    for {
+	   select {
+	       case  <-ch_heart :
+		       time.Sleep(time.Millisecond*50)
+		       
+	   
+	       case <- time.After(100 * time.Second):
+		      glog.V(2).Infoln("heart res timeout")
+		      linkornot = 1
+		      Conn1.Close()
+			  Conn2.Close()
+	   
+	   
+	   }
+	
+	
+	}
+
+}
 var Conn1 net.Conn 
 var Conn2 net.Conn 
 var i_ai int
 var i_fuyun int
 func main() {  
-  
+    ch_heart = make(chan int ,2)
+	go check_ch_heart()
 //建立socket，监听端口
 	defer func(){
 	    glog.Flush()
@@ -325,7 +396,7 @@ func handleConnection(conn net.Conn) {
 	    return
 	}
 	
-	
+	go start_send_heart_req(conn   , skey1)
 	
 	for {
 	
@@ -387,6 +458,42 @@ func handleConnection(conn net.Conn) {
     */ 
   
 } 
+func start_send_heart_req(conn net.Conn , readkey string){
+    type HEARTREQ struct {
+	   Type string `json:"type"`
+	   Time int64 `json:"time"`
+	   Crc string `json:"crc"`
+	}
+	var hearreq HEARTREQ
+	hearreq.Type = "heart_req"
+	for {
+	    if linkornot == 1 {
+		   glog.V(2).Infoln(conn.RemoteAddr().String(),"connection is closed by others, heart_req stop")
+		   return
+		
+		}
+		hearreq.Time = time.Now().Unix()
+		
+		inhash := hearreq.Type+fmt.Sprintf("%d",hearreq.Time)+ readkey
+		hearreq.Crc = CalcMd5(inhash)
+		
+		heartreqstr , err := json.Marshal(hearreq)
+		if err != nil {
+		   glog.V(2).Infoln(conn.RemoteAddr().String(),err)
+		   continue
+		
+		}
+		n, err := conn.Write([]byte(heartreqstr))
+		if err != nil {
+			 glog.V(2).Infoln(conn.RemoteAddr().String(),err)
+			 return
+		}
+		time.Sleep(time.Millisecond*100)
+	
+	}
+
+
+}
 func  read_robot_abort(buffer []byte) int {
     type ROBOTABORT struct {
 	   Type string `json:"type"`
