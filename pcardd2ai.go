@@ -250,7 +250,41 @@ func check_heart_res(buffer []byte ,readkey string)  int {
 		   return     -1 
 		 
 		 }
-		 
+		 if typetimecrc.Type == "ai_ready_req" {
+		    inhash1 := typetimecrc.Type+fmt.Sprintf("%d",typetimecrc.Time)+ readkey
+			if  typetimecrc.Crc !=  CalcMd5(inhash1) {
+				glog.V(2).Infoln(b_str)
+			    return   -3
+		    }
+			type AIREADYRES struct {
+				Type string `json:"type" bson:"type"`
+				Result int `json:"result" bson:"result"`
+				Time int64 `json:"time" bson:"time"`
+				Crc string `json:"crc" bson:"crc"`
+	 
+			}
+			var aireadyres AIREADYRES
+			aireadyres.Type = "ai_ready_res"
+			if ai_active == 1 {
+				aireadyres.Result = 1
+			}else{
+			    aireadyres.Result = 0
+			}
+			aireadyres.Time = time.Now().Unix()
+			inhash2 := aireadyres.Type+fmt.Sprintf("%d",aireadyres.Time)+ readkey
+			aireadyres.Crc = CalcMd5(inhash2)
+			baireadyres , err := json.Marshal(aireadyres)
+			if err != nil {
+			   return -4
+			}
+			n, err := Conn1.Write(baireadyres)
+			if err != nil {
+			    glog.V(2).Infoln(err)
+			}else{
+				glog.V(2).Infoln(string(baireadyres[:n]))
+			}
+		    continue
+		 }
 		 if typetimecrc.Type != "heart_res" {
 		     continue
 		 }
@@ -270,15 +304,18 @@ func check_heart_res(buffer []byte ,readkey string)  int {
      return 0
 
 }
+
+var ai_active int
 func ai_check_ch_heart(){
     for {
 	   select {
 	       case  <-ch_heart0 :
 		       time.Sleep(time.Millisecond*50)
-		       
+		       ai_active = 1
 	       
 			   
 	       case <- time.After(100 * time.Second):
+		      ai_active = 0
 		      if aiflag_start_send_heart_req == 0 {
 				fmt.Println("aiflag_flag_start_send_heart_req = 0") 
 				continue
@@ -409,7 +446,7 @@ func handleConnection(conn net.Conn) {
 	    n , err  = exchangesocket(conn,Conn2)
 		if err != nil {
 		
-		     glog.V(2).Infoln(conn.RemoteAddr().String(), "exchange error: ", err)  
+		     glog.V(2).Infoln(conn.RemoteAddr().String(), "exchange error: ", err,"ret is:",n)  
 			 if err == io.EOF || n == -99{
 			    linkornot = 1
 				glog.V(2).Infoln("fuyun read io.EOF or n==-99,connections failed",n)
