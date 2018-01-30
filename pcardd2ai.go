@@ -89,11 +89,7 @@ func aihandleConnection(conn net.Conn) {
 		}
 		
 		
-	    if Conn1 == nil {
-		   time.Sleep(time.Second*10)
-		   glog.V(2).Infoln(" ai Conn1 == nil")
-		   continue
-		}
+	   
 	   
 	    n , err  = exchangesocket(conn,Conn1)
 		if err != nil {
@@ -115,29 +111,7 @@ func aihandleConnection(conn net.Conn) {
 	
 	}
 	
-	
-	/*
-	n,err = Read_robot_req(conn )
-	if !(n==0 && err == nil) {
-	     glog.V(2).Infoln(conn.RemoteAddr().String(),"read robot req  error number:",n,"error:",err)
-		 return
-	}
-	
-	n,err = Send_robot_res(conn)
-	if  err != nil {
-	    glog.V(2).Infoln(conn.RemoteAddr().String(),"send robot res  error number:",n,"error:",err)
-		return
-	
-	}
-	for {
-		n,err = Read_action_cmd(conn)
-		if !(n==0 && err == nil){
-			glog.V(2).Infoln(conn.RemoteAddr().String(),"Read_action_cmd  error number:",n,"error:",err)
-			return
-			
-		}
-	}
-	*/
+ 
 	
 }
 
@@ -181,12 +155,17 @@ func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]strin
 }
 
 func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
+   
     var  xbuffer1 []string
     buffer := make([]byte, 20480)
     conn1.SetReadDeadline(time.Now().Add(time.Duration(100) * time.Second))  
     
-	n, err := conn1.Read(buffer) 
-	glog.V(2).Infoln(string(buffer))
+	n, err := conn1.Read(buffer)	
+    if err != nil {  
+        glog.V(2).Infoln(conn1.RemoteAddr().String(), "read error1: ", err)  
+        return  -99, err
+    }
+	glog.V(2).Infoln(string(buffer[:n]))
 	var readkey  string
 	if conn1 == Conn2 {
 	   readkey = SKEY1AI
@@ -194,12 +173,16 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
 	   readkey = skey1
 	}
 	if check_heart_res(buffer ,readkey) != 0 {
-	    return  -99 , fmt.Errorf("%s : heart res error" , conn1.RemoteAddr().String())
+	    return  -6 , fmt.Errorf("%s : heart res error" , conn1.RemoteAddr().String())
 	}
-    if err != nil {  
-        glog.V(2).Infoln(conn1.RemoteAddr().String(), "read error1: ", err)  
-        return  -99, err
-    }
+	 if conn2 == nil {
+	  // glog.V(2).Info(conn1.RemoteAddr().String(),"conn2 is null")
+	   if conn1 == Conn2 {
+			return -5 ,fmt.Errorf("%s :fuyun conn is null" , conn1.RemoteAddr().String())
+	   }else{
+	        return -5 ,fmt.Errorf("%s : ai conn is null" , conn1.RemoteAddr().String())
+	   }
+	}
 	if conn1 == Conn2 {
 	   xbuffer , ret := fixCrcOfEx(buffer,n,SKEY1AI,skey1)
 	   if ret != 0 {
@@ -243,7 +226,8 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
 
 
 }
-var ch_heart chan int
+var ch_heart0 chan int
+var ch_heart1 chan int
 func check_heart_res(buffer []byte ,readkey string)  int {
      type TYPETIMECRC struct {
 	    Type string `json:"type" bson:"type"`
@@ -276,30 +260,61 @@ func check_heart_res(buffer []byte ,readkey string)  int {
 		    glog.V(2).Infoln(b_str)
 			return     -2 
 		 }
-		 ch_heart <- 1
+		 if readkey == SKEY1AI {
+			ch_heart0 <- 0
+		 }else{
+			ch_heart1 <- 1
+		 }
 		 
 	 }
      return 0
 
 }
+func ai_check_ch_heart(){
+    for {
+	   select {
+	       case  <-ch_heart0 :
+		       time.Sleep(time.Millisecond*50)
+		       
+	       
+			   
+	       case <- time.After(100 * time.Second):
+		      if aiflag_start_send_heart_req == 0 {
+				fmt.Println("aiflag_flag_start_send_heart_req = 0") 
+				continue
+			  }
+		      glog.V(2).Infoln("ai heart res timeout")
+		       
+			  if   Conn2 != nil {
+				   
+				  Conn2.Close()
+			  }
+	   
+	   
+	   }
+	
+	
+	}
 
+}
 func check_ch_heart(){
     for {
 	   select {
-	       case  <-ch_heart :
-		       time.Sleep(time.Millisecond*50)
+	        
 		       
-	   
+	       case  <-ch_heart1 :
+		       time.Sleep(time.Millisecond*50)
+			   
 	       case <- time.After(100 * time.Second):
 		      if flag_start_send_heart_req == 0 {
 				fmt.Println("flag_flag_start_send_heart_req = 0") 
 				continue
 			  }
-		      glog.V(2).Infoln("heart res timeout")
-		      linkornot = 1
-			  if Conn1 != nil && Conn2 != nil {
+		      glog.V(2).Infoln("fuyun heart res timeout")
+		       
+			  if Conn1 != nil   {
 				  Conn1.Close()
-				  Conn2.Close()
+				   
 			  }
 	   
 	   
@@ -314,8 +329,10 @@ var Conn2 net.Conn
 var i_ai int
 var i_fuyun int
 func main() {  
-    ch_heart = make(chan int ,64)
+    ch_heart0 = make(chan int ,256)
+	ch_heart1 = make(chan int ,256)
 	go check_ch_heart()
+	go ai_check_ch_heart()
 //建立socket，监听端口
 	defer func(){
 	    glog.Flush()
@@ -386,11 +403,7 @@ func handleConnection(conn net.Conn) {
 		
 		}
 	
-	    if Conn2 == nil {
-		   time.Sleep(time.Second*10)
-		   glog.V(2).Infoln(" fuyun Conn2 == nil")
-		   continue
-		}
+	    
 		
 		
 	    n , err  = exchangesocket(conn,Conn2)
@@ -440,6 +453,8 @@ func handleConnection(conn net.Conn) {
     */ 
   
 } 
+var aiflag_start_send_heart_req int
+
 var flag_start_send_heart_req int
 func start_send_heart_req(conn net.Conn , readkey string){
     type HEARTREQ struct {
@@ -448,9 +463,17 @@ func start_send_heart_req(conn net.Conn , readkey string){
 	   Crc string `json:"crc"`
 	}
 	defer func(){
-	    flag_start_send_heart_req = 0
+	    if readkey == SKEY1AI {
+	        aiflag_start_send_heart_req = 0
+		}else{
+		    flag_start_send_heart_req = 0
+		}
 	}()
-	flag_start_send_heart_req = 1
+	if readkey == SKEY1AI {
+		aiflag_start_send_heart_req = 1
+	}else{
+		flag_start_send_heart_req = 1
+	}
 	var hearreq HEARTREQ
 	hearreq.Type = "heart_req"
 	for {
