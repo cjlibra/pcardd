@@ -24,7 +24,7 @@ const (
 
 
 )
-var linkornot int
+ 
 func ai2server(){
     netListen, err := net.Listen("tcp", AIHOSTIPPORT)  
     CheckError(err)  
@@ -47,7 +47,7 @@ func ai2server(){
         glog.V(2).Infoln(conn.RemoteAddr().String(), " tcp connect success from ai")  
 		
 		Conn2 = conn 
-		linkornot = 0
+		 
         go aihandleConnection(conn)  
     }  
 
@@ -82,11 +82,7 @@ func aihandleConnection(conn net.Conn) {
 
 	for {
 	
-	    if linkornot == 1 {
-		   glog.V(2).Infoln("ai stop connection")
-		   return
-		
-		}
+	   
 		
 		
 	   
@@ -95,13 +91,17 @@ func aihandleConnection(conn net.Conn) {
 		if err != nil {
 		
 		     glog.V(2).Infoln(conn.RemoteAddr().String(), "exchange error  from ai: ", err)  
-			 if err == io.EOF || n == -99 {
-			    linkornot = 1
-				glog.V(2).Infoln(" ai read io.EOF or n== -99,connections failed" , n)
-			    return
+			 if  err == io.EOF || n == -98 {
+			     glog.V(2).Infoln(" ai connections lost" , n)
+			     return
+			 }
+			 if  n == -99 {
+			   
+				glog.V(2).Infoln(" fuyun connections lost" , n)
+			    
 			 }
 			 time.Sleep(time.Second*2)
-            // return   
+             
 		
 		
 		}
@@ -138,7 +138,9 @@ func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]strin
 		   return   outstring , -1 
 		 
 		 }
-		 
+		 if typetimecrc.Type == "ai_ready_req" || typetimecrc.Type == "heart_res" {
+			continue
+		 }
 		 inhash := typetimecrc.Type+fmt.Sprintf("%d",typetimecrc.Time)+ readkey
 		 if  typetimecrc.Crc !=  CalcMd5(inhash) {
 		    glog.V(2).Infoln(b_str)
@@ -163,7 +165,7 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
 	n, err := conn1.Read(buffer)	
     if err != nil {  
         glog.V(2).Infoln(conn1.RemoteAddr().String(), "read error1: ", err)  
-        return  -99, err
+        return  -98, err
     }
 	glog.V(2).Infoln(string(buffer[:n]))
 	var readkey  string
@@ -314,7 +316,7 @@ func ai_check_ch_heart(){
 		       ai_active = 1
 	       
 			   
-	       case <- time.After(100 * time.Second):
+	       case <- time.After(18 * time.Second):
 		      ai_active = 0
 		      if aiflag_start_send_heart_req == 0 {
 				fmt.Println("aiflag_flag_start_send_heart_req = 0") 
@@ -400,7 +402,7 @@ func main() {
 		
 		 
 		Conn1 = conn
-		linkornot = 0
+		 
         go handleConnection(conn)  
     }  
 }  
@@ -434,11 +436,7 @@ func handleConnection(conn net.Conn) {
 	for {
 	
 	
-	    if linkornot == 1 {
-		   glog.V(2).Infoln("fuyun stop connection")
-		   return
-		
-		}
+	    
 	
 	    
 		
@@ -447,10 +445,13 @@ func handleConnection(conn net.Conn) {
 		if err != nil {
 		
 		     glog.V(2).Infoln(conn.RemoteAddr().String(), "exchange error: ", err,"ret is:",n)  
-			 if err == io.EOF || n == -99{
-			    linkornot = 1
-				glog.V(2).Infoln("fuyun read io.EOF or n==-99,connections failed",n)
+			 if err == io.EOF || n == -98{
+			     
+				glog.V(2).Infoln("fuyun read io.EOF or n==-98,connections lost",n)
 			    return
+			 }
+			 if   n == -99{
+			    glog.V(2).Infoln("ai connections lost",n)
 			 }
 			 time.Sleep(time.Second*2)
             // return   
@@ -463,35 +464,10 @@ func handleConnection(conn net.Conn) {
 	
 	}
 	
-	/*
 	
-	n,err = Read_robot_req(conn )
-	if !(n==0 && err == nil) {
-	     glog.V(2).Infoln(conn.RemoteAddr().String(),"read robot req  error number:",n,"error:",err)
-		 return
-	}
-	
-	n,err = Send_robot_res(conn)
-	if  err != nil {
-	    glog.V(2).Infoln(conn.RemoteAddr().String(),"send robot res  error number:",n,"error:",err)
-		return
-	
-	}*/
-	
-	/*
-	for {
-		n,err = Read_action_cmd(conn)
-		if !(n==0 && err == nil){
-			glog.V(2).Infoln(conn.RemoteAddr().String(),"Read_action_cmd  error number:",n,"error:",err)
-			return
-			
-		}
-	}
-    */ 
   
 } 
 var aiflag_start_send_heart_req int
-
 var flag_start_send_heart_req int
 func start_send_heart_req(conn net.Conn , readkey string){
     type HEARTREQ struct {
@@ -514,11 +490,7 @@ func start_send_heart_req(conn net.Conn , readkey string){
 	var hearreq HEARTREQ
 	hearreq.Type = "heart_req"
 	for {
-	    if linkornot == 1 {
-		   glog.V(2).Infoln(conn.RemoteAddr().String(),"connection is closed by others, heart_req stop")
-		   return
-		
-		}
+	     
 		hearreq.Time = time.Now().Unix()
 		
 		inhash := hearreq.Type+fmt.Sprintf("%d",hearreq.Time)+ readkey
