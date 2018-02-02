@@ -21,6 +21,8 @@ const (
 	SKEY2AI = "qiansi_ai_2"
 	skey1 = "91ylordai"
 	skey2 = "91ylordai2"
+	
+	heart_timeout = 5
 
 
 )
@@ -316,7 +318,7 @@ func ai_check_ch_heart(){
 		       ai_active = 1
 	       
 			   
-	       case <- time.After(18 * time.Second):
+	       case <- time.After(3*heart_timeout * time.Second):
 		      ai_active = 0
 		      if aiflag_start_send_heart_req == 0 {
 				fmt.Println("aiflag_flag_start_send_heart_req = 0") 
@@ -344,7 +346,7 @@ func check_ch_heart(){
 	       case  <-ch_heart1 :
 		       time.Sleep(time.Millisecond*50)
 			   
-	       case <- time.After(100 * time.Second):
+	       case <- time.After(3*heart_timeout * time.Second):
 		      if flag_start_send_heart_req == 0 {
 				fmt.Println("flag_flag_start_send_heart_req = 0") 
 				continue
@@ -507,7 +509,7 @@ func start_send_heart_req(conn net.Conn , readkey string){
 			 glog.V(2).Infoln(conn.RemoteAddr().String(),err)
 			 return
 		}
-		time.Sleep(time.Millisecond*5000)
+		time.Sleep(time.Second * heart_timeout)
 	
 	}
 
