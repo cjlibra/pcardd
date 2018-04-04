@@ -128,6 +128,7 @@ func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]strin
 	 var typetimecrc TYPETIMECRC
 	 buffer_str := StripHttpStr(string(buffer))
 	 buffer_strs :=strings.Replace(buffer_str,"}{","}\x00{",-1)
+	 buffer_strs =strings.Replace(buffer_strs,"}\x00\x00{","}\x00{",-1)
 	 buffer_strs =strings.Replace(buffer_strs,"}\x0a{","}\x00{",-1)
 	 b_strs :=strings.Split(buffer_strs,"\x00")
 	 for _,b_str := range b_strs {
@@ -242,6 +243,7 @@ func check_heart_res(buffer []byte ,readkey string)  int {
      var typetimecrc TYPETIMECRC
 	 buffer_str := StripHttpStr(string(buffer))
 	 buffer_strs :=strings.Replace(buffer_str,"}{","}\x00{",-1)
+	 buffer_strs =strings.Replace(buffer_strs,"}\x00\x00{","}\x00{",-1)
 	 buffer_strs =strings.Replace(buffer_strs,"}\x0a{","}\x00{",-1)
 	 b_strs :=strings.Split(buffer_strs,"\x00")
 	 for _,b_str := range b_strs {
