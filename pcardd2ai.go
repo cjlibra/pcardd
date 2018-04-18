@@ -214,7 +214,7 @@ func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
 		   conn2 = Conn2
 		}
 	    n , err = conn2.Write([]byte(xbuf))
-	    time.Sleep(time. Millisecond * 100)
+	    //time.Sleep(time. Millisecond * 100)
 	    glog.V(2).Infoln(xbuf,n)
 	
 	
