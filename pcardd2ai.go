@@ -162,7 +162,7 @@ func fixCrcOfEx(buffer []byte ,n int, readkey string , writekey string) ([]strin
 func exchangesocket(conn1 net.Conn,conn2 net.Conn)(int , error){
    
     var  xbuffer1 []string
-    buffer := make([]byte, 20480)
+    buffer := make([]byte, 4*1024*1024)
     conn1.SetReadDeadline(time.Now().Add(time.Duration(100) * time.Second))  
     
 	n, err := conn1.Read(buffer)	
